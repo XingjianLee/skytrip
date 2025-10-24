@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/flights/creat_airlines.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/flights/create_airports.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/flights/create_flights.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/flights/create_flights_value.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/flights/create_routes.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/orders/create_check_ins.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/orders/create_order_items.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/orders/create_orders.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/passengers/create_passengers.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/users/create_agencies.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/users/create_users.sql" dialect="MySQL" />
+  </component>
+</project>
