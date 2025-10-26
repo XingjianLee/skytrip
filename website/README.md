@@ -1,73 +1,87 @@
-# Welcome to your Lovable project
+# SkyTrip website
 
-## Project info
+现代化的综合旅行服务平台前端，提供机票预订、酒店预订、景点门票等一站式旅行服务。
 
-**URL**: https://lovable.dev/projects/5be60e3b-7dcb-4811-b7f0-e3162ee84196
+## ✨ 主要功能
 
-## How can I edit this code?
+- 🛫 **机票预订** - 搜索和预订国内外航班
+- 🏨 **酒店预订** - 全球酒店搜索和预订
+- 🎫 **景点门票** - 热门景点门票预订
+- 📱 **在线值机** - 提前选座和值机
+- 📅 **价格日历** - 查看最优价格趋势
+- 🤖 **旅行助手** - AI 智能旅行建议
+- 🔄 **退改签** - 便捷的退票改签服务
+- 🎧 **客服中心** - 在线客服支持
 
-There are several ways of editing your application.
+## 🛠️ 技术栈
 
-**Use Lovable**
+### 前端框架
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5be60e3b-7dcb-4811-b7f0-e3162ee84196) and start prompting.
+- **React 18** - 现代化的用户界面库
+- **TypeScript** - 类型安全的 JavaScript
+- **Vite** - 快速的构建工具
 
-Changes made via Lovable will be committed automatically to this repo.
+### UI 组件库
 
-**Use your preferred IDE**
+- **shadcn/ui** - 现代化的 UI 组件库
+- **Radix UI** - 无样式的可访问组件
+- **Tailwind CSS** - 实用优先的 CSS 框架
+- **Lucide React** - 精美的图标库
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 状态管理与路由
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **React Router DOM** - 客户端路由
+- **TanStack Query** - 数据获取和缓存
+- **React Hook Form** - 表单状态管理
+- **Zod** - 数据验证
 
-Follow these steps:
+### 其他工具
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- **Mapbox GL** - 地图服务
+- **Recharts** - 数据可视化
+- **Sonner** - 通知组件
+- **date-fns** - 日期处理
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🚀 快速开始
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 环境要求
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+- Node.js 18+
+- npm 或 yarn
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 启动开发服务器
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 📁 项目结构
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+src/
+├── components/          # 可复用组件
+│   ├── ui/             # UI基础组件
+│   └── trips/          # 旅行相关组件
+├── pages/              # 页面组件
+├── hooks/              # 自定义Hooks
+├── lib/                # 工具函数
+└── assets/             # 静态资源
+```
 
-**Use GitHub Codespaces**
+## 🎨 设计特色
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- 📱 响应式设计，支持移动端和桌面端
+- 🌙 支持明暗主题切换
+- 🎯 现代化的用户界面设计
+- ♿ 良好的可访问性支持
+- ⚡ 快速的页面加载和交互
 
-## What technologies are used for this project?
+## 📄 许可证
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/5be60e3b-7dcb-4811-b7f0-e3162ee84196) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+MIT License
