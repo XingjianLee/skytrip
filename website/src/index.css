@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 160 60% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 160 60% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 160 60% 10%;
+
+    /* Deep forest green - primary brand color */
+    --primary: 160 45% 15%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Bright mint green - accent color */
+    --accent: 150 60% 60%;
+    --accent-foreground: 160 45% 15%;
+    
+    /* Lighter green for hover states */
+    --accent-hover: 150 55% 65%;
+
+    --secondary: 30 20% 95%;
+    --secondary-foreground: 160 60% 10%;
+
+    --muted: 30 15% 92%;
+    --muted-foreground: 160 20% 40%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 160 15% 88%;
+    --input: 160 15% 88%;
+    --ring: 150 60% 60%;
+
+    --radius: 0.75rem;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(160 45% 15%), hsl(160 50% 20%));
+    --gradient-accent: linear-gradient(135deg, hsl(150 60% 60%), hsl(150 55% 70%));
+    --gradient-hero: linear-gradient(180deg, hsl(160 45% 15%), hsl(160 40% 18%));
+    
+    /* Shadows */
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.12);
+    --shadow-accent: 0 4px 20px rgba(123, 220, 143, 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
