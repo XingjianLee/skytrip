@@ -18,3 +18,5 @@ INSERT INTO airlines (airline_code, airline_name) VALUES
 ('CZ', '中国南方航空'),
 ('HU', '海南航空'),
 ('3U', '四川航空');
+
+ALTER TABLE airlines CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;

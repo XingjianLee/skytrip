@@ -47,3 +47,4 @@ INSERT INTO routes (departure_airport_code, arrival_airport_code, distance_km) V
 ('CSX', 'CAN', 600),
 ('XIY', 'CTU', 750),
 ('XIY', 'CTO', 730);
+
