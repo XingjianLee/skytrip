@@ -1,6 +1,10 @@
 from sqlalchemy import Column, Integer, BigInteger, String, DECIMAL, Enum, DateTime, ForeignKey, Index
 from sqlalchemy.orm import relationship
+
 from app.models.base import Base, TimestampMixin
+from app.models.passenger import Passenger
+from app.models.flight import Flight
+
 import enum
 
 

@@ -88,3 +88,5 @@ class FlightPricing(FlightPricingInDBBase):
 
 class FlightWithPricing(FlightWithDetails):
     pricing: List[FlightPricing] = []
+
+FlightWithDetails.model_rebuild()

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, CreditCard, Smartphone, Wallet, Lock, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -10,6 +10,15 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { getOrder, payOrder } from "@/lib/api";
+
+type OrderItemRes = { cabin_class: "economy" | "business" | "first" };
+type OrderRes = {
+    order_id: number;
+    total_amount_original: number | string;
+    total_amount: number | string;
+    items: OrderItemRes[];
+};
 
 interface PaymentMethod {
     id: string;
@@ -24,6 +33,7 @@ const Payment = () => {
     const location = useLocation();
     const { toast } = useToast();
     const orderData = location.state?.orderData;
+    const [order, setOrder] = useState<OrderRes | null>(null);
 
     const [selectedMethod, setSelectedMethod] = useState("alipay");
     const [cardInfo, setCardInfo] = useState({
@@ -75,20 +85,42 @@ const Payment = () => {
         }
     ];
 
-    if (!orderData) {
-        return (
-            <div className="min-h-screen flex flex-col bg-background">
-                <Navbar isLoggedIn={true} />
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                        <p className="text-muted-foreground mb-4">订单信息丢失</p>
-                        <Button onClick={() => navigate("/book-flight")}>返回首页</Button>
-                    </div>
-                </div>
-                <Footer />
-            </div>
-        );
-    }
+    useEffect(() => {
+        (async () => {
+            try {
+                const token = localStorage.getItem("access_token") || "";
+                if (!token) return;
+                const oid = orderData?.orderId;
+                if (!oid) return;
+                const data = await getOrder(Number(oid), token);
+                setOrder(data as OrderRes);
+            } catch (e) {
+                // ignore for display fallback
+            }
+        })();
+    }, [orderData]);
+
+    const summary = useMemo(() => {
+        const passengerCount = order?.items?.length ?? (orderData?.passengerCount ?? 0);
+        const basePrice = order ? Number(order.total_amount_original ?? 0) : Number(orderData?.basePrice ?? 0);
+        const airportFee = order ? 0 : Number(orderData?.airportFee ?? 0);
+        const fuelSurcharge = order ? 0 : Number(orderData?.fuelSurcharge ?? 0);
+        const grandTotal = order ? Number(order.total_amount ?? 0) : Number(orderData?.grandTotal ?? 0);
+        const cabinName = (() => {
+            if (!order || !order.items) return orderData?.cabinName || "";
+            const set: Set<string> = new Set<string>(order.items.map((it) => String(it.cabin_class)));
+            const map: Record<"economy" | "business" | "first", string> = { economy: "经济舱", business: "商务舱", first: "头等舱" };
+            if (set.size === 1) {
+                const v = String([...set][0]);
+                if (v === "economy" || v === "business" || v === "first") {
+                    return map[v];
+                }
+                return v;
+            }
+            return "多舱位";
+        })();
+        return { passengerCount, basePrice, airportFee, fuelSurcharge, grandTotal, cabinName };
+    }, [order, orderData]);
 
     const handlePayment = () => {
         if (selectedMethod === "card") {
@@ -111,23 +143,36 @@ const Payment = () => {
             }
         }
 
-        toast({
-            title: "正在处理支付",
-            description: "请稍候..."
-        });
-
-        // 模拟支付处理
-        setTimeout(() => {
-            toast({
-                title: "支付成功！",
-                description: "订单已确认，祝您旅途愉快"
-            });
-
-            setTimeout(() => {
+        (async () => {
+            try {
+                toast({ title: "正在处理支付", description: "请稍候..." });
+                const token = localStorage.getItem("access_token") || "";
+                const oid = order?.order_id ?? orderData?.orderId;
+                if (!oid || !token) throw new Error("订单或登录信息缺失");
+                await payOrder(Number(oid), token);
+                toast({ title: "支付成功！", description: "订单已确认，祝您旅途愉快" });
                 navigate("/my-orders");
-            }, 1500);
-        }, 2000);
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                toast({ title: msg || "支付失败", variant: "destructive" });
+            }
+        })();
     };
+
+    if (!orderData) {
+        return (
+            <div className="min-h-screen flex flex-col bg-background">
+                <Navbar isLoggedIn={true} />
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-muted-foreground mb-4">订单信息丢失</p>
+                        <Button onClick={() => navigate("/book-flight")}>返回首页</Button>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex flex-col bg-background">
@@ -297,12 +342,12 @@ const Payment = () => {
 
                                     <div>
                                         <div className="text-sm text-muted-foreground mb-1">舱位类型</div>
-                                        <div className="font-medium">{orderData.cabinName}</div>
+                                        <div className="font-medium">{summary.cabinName}</div>
                                     </div>
 
                                     <div>
                                         <div className="text-sm text-muted-foreground mb-1">乘机人数</div>
-                                        <div className="font-medium">{orderData.passengerCount} 人</div>
+                                        <div className="font-medium">{summary.passengerCount} 人</div>
                                     </div>
 
                                     <Separator />
@@ -310,15 +355,15 @@ const Payment = () => {
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">基础票价</span>
-                                            <span>¥{orderData.basePrice}</span>
+                                            <span>¥{summary.basePrice}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">机场建设费</span>
-                                            <span>¥{orderData.airportFee}</span>
+                                            <span>¥{summary.airportFee}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">燃油附加费</span>
-                                            <span>¥{orderData.fuelSurcharge}</span>
+                                            <span>¥{summary.fuelSurcharge}</span>
                                         </div>
                                     </div>
 
@@ -328,7 +373,7 @@ const Payment = () => {
                                         <span className="text-lg font-semibold">应付总额</span>
                                         <div className="text-right">
                                             <div className="text-3xl font-bold text-primary">
-                                                ¥{orderData.grandTotal}
+                                                ¥{summary.grandTotal}
                                             </div>
                                         </div>
                                     </div>

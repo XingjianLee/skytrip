@@ -3,16 +3,16 @@ from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, get_current_active_user
-from app import crud, schemas, models
+from ... import dependencies as deps
+from ... import crud, schemas, models
 
 router = APIRouter()
 
 
 @router.get("/", response_model=List[schemas.OrderWithItems])
 def list_orders(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
     skip: int = 0,
     limit: int = 100,
     status: Optional[schemas.OrderStatus] = Query(None, description="订单状态"),
@@ -60,9 +60,9 @@ def list_orders(
 @router.get("/{order_id}", response_model=schemas.OrderWithItems)
 def get_order(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     order_id: int,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     根据订单ID获取订单详情
@@ -81,9 +81,9 @@ def get_order(
 @router.post("/", response_model=schemas.OrderWithItems)
 def create_order(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     order_in: schemas.OrderCreate,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """创建新订单（含订单项），支持多人同航班或多个航班，座位校验与价格计算"""
     from sqlalchemy import select

@@ -86,6 +86,19 @@ export async function payOrder(order_id: number, token: string) {
   return res.json();
 }
 
+export async function getOrder(order_id: number, token: string) {
+  const url = `http://0.0.0.0:8000/api/v1/orders/${order_id}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 // ===== Auth & User APIs (keep existing exports used across the app) =====
 export async function login(username: string, password: string) {
   const body = new URLSearchParams();

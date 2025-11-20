@@ -1,7 +1,7 @@
 # Pydantic schemas
 from .user import (
-    User, UserCreate, UserUpdate, UserLogin, 
-    Token, TokenData, VipLevel, UserRole
+    User, UserCreate, UserUpdate, 
+    Token, TokenPayload
 )
 from .airline import (
     Airline, AirlineCreate, AirlineUpdate, AirlineWithFlights

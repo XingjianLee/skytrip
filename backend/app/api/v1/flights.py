@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 
-from app.dependencies import get_db
-from app import crud, schemas
-from app.models.flight_pricing import CabinClass
+from ... import dependencies as deps
+from ... import crud, schemas
+from ...models.flight_pricing import CabinClass
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.post("/search", response_model=schemas.FlightSearchResponse)
 def search_flights(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     search_request: schemas.FlightSearchRequest
 ) -> Any:
     """
@@ -66,7 +66,7 @@ def search_flights(
                 total_seats = first_seats
 
             # 计算已占用座位（订单项未过期且状态为pending/paid）
-            from app.models.order import Order, OrderItem, OrderStatus
+            from ...models.order import Order, OrderItem, OrderStatus
             now = datetime.utcnow()
             occupied = db.query(func.count(OrderItem.item_id)).join(Order, OrderItem.order_id == Order.order_id).filter(
                 OrderItem.flight_id == flight_id,
@@ -138,7 +138,7 @@ def search_flights(
 @router.get("/{flight_id}", response_model=schemas.FlightWithDetails)
 def get_flight_details(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     flight_id: int
 ) -> Any:
     """
@@ -153,7 +153,7 @@ def get_flight_details(
 @router.get("/{flight_id}/availability", response_model=List[schemas.FlightAvailability])
 def get_flight_availability(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     flight_id: int,
     flight_date: date = Query(..., description="航班日期")
 ) -> Any:
@@ -185,7 +185,7 @@ def get_flight_availability(
 
 @router.get("/", response_model=List[schemas.Flight])
 def list_flights(
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
     airline_code: Optional[str] = None,
@@ -205,7 +205,7 @@ def list_flights(
 @router.get("/{flight_id}/pricing", response_model=List[schemas.FlightPricing])
 def get_flight_pricing(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     flight_id: int
 ) -> Any:
     """

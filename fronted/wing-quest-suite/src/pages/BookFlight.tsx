@@ -215,20 +215,13 @@ export default function BookFlight() {
             getFlightPricing(f.id),
             getFlightAvailability(f.id, f.departure.date),
           ]);
-          const toCabin = (c: string): "economy"|"business"|"first" => {
-            const lower = c.toLowerCase();
-            if (lower === "economy" || lower === "business" || lower === "first") return lower as any;
-            return "economy"; // fallback，避免未识别枚举导致显示为 0
-          };
-          const pricingMap: Record<"economy"|"business"|"first", number> = { economy: 0, business: 0, first: 0 };
+          const pricingMap: Record<"economy" | "business" | "first", number> = { economy: 0, business: 0, first: 0 };
           for (const p of pricingList) {
-            const key = toCabin((p as any).cabin_class);
-            pricingMap[key] = p.base_price ?? 0;
+            pricingMap[p.cabin_class] = p.base_price;
           }
-          const availabilityMap: Record<"economy"|"business"|"first", number> = { economy: 0, business: 0, first: 0 };
+          const availabilityMap: Record<"economy" | "business" | "first", number> = { economy: 0, business: 0, first: 0 };
           for (const a of availabilityList) {
-            const key = toCabin((a as any).cabin_class);
-            availabilityMap[key] = a.available_seats ?? 0;
+            availabilityMap[a.cabin_class] = a.available_seats;
           }
           // 根据当前筛选舱位更新卡片的主价与主座显示
           const selected = f.cabinClass === "all" ? "economy" : f.cabinClass;

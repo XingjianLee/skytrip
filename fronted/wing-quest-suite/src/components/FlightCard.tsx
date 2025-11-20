@@ -4,17 +4,16 @@ import { Badge } from "@/components/ui/badge";
 import { Plane, Clock, Wifi, Utensils, Tv, MapPin } from "lucide-react";
 
 type CabinType = "economy" | "business" | "first";
+type SelectedCabin = "all" | CabinType;
 
 interface FlightCardProps {
   flight: any;
-  selectedCabin?: "all" | CabinType;
+  selectedCabin?: SelectedCabin;
 }
 
 export default function FlightCard({ flight, selectedCabin = "all" }: FlightCardProps) {
   const navigate = useNavigate();
-  const selectedCabinNormalized: "all" | CabinType = selectedCabin ?? "all";
-  const isAll = selectedCabinNormalized === "all";
-  const selectedCabinType: CabinType | undefined = isAll ? undefined : (selectedCabinNormalized as CabinType);
+  const resolveCabin = (sc: SelectedCabin): CabinType => (sc === "all" ? "economy" : sc);
 
   const facilityIcons = {
     wifi: <Wifi className="h-4 w-4" />,
@@ -103,7 +102,7 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
                 ))}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {["economy", "business", "first"].map((cabin) => (
+                {(["economy", "business", "first"] as CabinType[]).map((cabin) => (
                   <div key={cabin} className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <div className="text-sm font-medium text-foreground">
@@ -111,10 +110,10 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
                         {cabin === "business" && "商务舱"}
                         {cabin === "first" && "头等舱"}
                       </div>
-                      <div className="text-xs text-muted-foreground">剩余 {flight.availabilityMap?.[cabin as CabinType] ?? flight.seats}</div>
+                      <div className="text-xs text-muted-foreground">剩余 {flight.availabilityMap?.[cabin] ?? flight.seats}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-accent">¥{flight.pricingMap?.[cabin as CabinType] ?? flight.price}</div>
+                      <div className="text-xl font-bold text-accent">¥{flight.pricingMap?.[cabin] ?? flight.price}</div>
                       <div className="text-xs text-muted-foreground">含税费</div>
                     </div>
                   </div>
@@ -138,14 +137,24 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
                     {facilityIcons[facility as keyof typeof facilityIcons]}
                   </div>
                 ))}
-                <span className="text-sm text-muted-foreground ml-2">
-                  剩余 {selectedCabinType ? (flight.availabilityMap?.[selectedCabinType] ?? flight.seats) : flight.seats} 座
-                </span>
+                {(() => {
+                  const currentCabin = resolveCabin(selectedCabin);
+                  const seats = flight.availabilityMap?.[currentCabin] ?? flight.seats;
+                  return (
+                    <span className="text-sm text-muted-foreground ml-2">剩余 {seats} 座</span>
+                  );
+                })()}
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-accent">¥{selectedCabinType ? (flight.pricingMap?.[selectedCabinType] ?? flight.price) : flight.price}</div>
+                  {(() => {
+                    const currentCabin = resolveCabin(selectedCabin);
+                    const price = flight.pricingMap?.[currentCabin] ?? flight.price;
+                    return (
+                      <div className="text-3xl font-bold text-accent">¥{price}</div>
+                    );
+                  })()}
                   <div className="text-xs text-muted-foreground">含税费</div>
                 </div>
                 <Button

@@ -3,7 +3,7 @@ from datetime import datetime, time
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db, get_current_active_user
+from app import dependencies as deps
 from app import crud, schemas, models
 
 router = APIRouter()
@@ -12,7 +12,7 @@ router = APIRouter()
 @router.post("/", response_model=schemas.CheckIn)
 def create_check_in(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     check_in_in: schemas.CheckInCreate,
     current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
@@ -59,9 +59,9 @@ def create_check_in(
 @router.get("/{check_in_id}", response_model=schemas.CheckInWithDetails)
 def get_check_in(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     check_in_id: int,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     根据值机ID获取值机详情
@@ -83,10 +83,10 @@ def get_check_in(
 @router.put("/{check_in_id}", response_model=schemas.CheckIn)
 def update_check_in(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     check_in_id: int,
     check_in_in: schemas.CheckInUpdate,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     更新值机信息
@@ -120,9 +120,9 @@ def update_check_in(
 @router.delete("/{check_in_id}")
 def cancel_check_in(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     check_in_id: int,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     取消值机
@@ -152,9 +152,9 @@ def cancel_check_in(
 @router.get("/passenger/{passenger_id}", response_model=List[schemas.CheckInWithDetails])
 def get_passenger_check_ins(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     passenger_id: int,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     获取乘客的值机记录列表
@@ -183,7 +183,7 @@ def get_passenger_check_ins(
 @router.get("/flight/{flight_id}/seats", response_model=List[str])
 def get_occupied_seats(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     flight_id: int,
     flight_date: str = Query(..., description="航班日期 (YYYY-MM-DD)")
 ) -> Any:
@@ -206,9 +206,9 @@ def get_occupied_seats(
 @router.post("/seat-selection", response_model=schemas.SeatSelection)
 def select_seat(
     *,
-    db: Session = Depends(get_db),
+    db: Session = Depends(deps.get_db),
     seat_selection: schemas.SeatSelection,
-    current_user: models.User = Depends(get_current_active_user)
+    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     选择座位

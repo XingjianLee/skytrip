@@ -1,6 +1,7 @@
 from sqlalchemy import Column, BigInteger, String, Enum, Date, Index
 from sqlalchemy.orm import relationship
 from app.models.base import Base
+from app.models.check_in import CheckIn
 import enum
 
 
