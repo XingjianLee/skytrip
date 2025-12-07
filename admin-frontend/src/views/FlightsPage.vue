@@ -1,16 +1,36 @@
 <template>
   <a-space direction="vertical" size="large" style="width: 100%">
     <a-space>
-      <a-button type="primary" @click="openModal()">新增航班</a-button>
-      <a-button @click="loadData">刷新</a-button>
+      <a-button type="primary" @click="openModal()">
+        <template #icon>
+          <PlusOutlined />
+        </template>
+        新增航班
+      </a-button>
+      <a-button @click="loadData">
+        <template #icon>
+          <ReloadOutlined />
+        </template>
+        刷新
+      </a-button>
     </a-space>
     <a-table :columns="columns" :data-source="flights" row-key="flight_id" :loading="loading">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'actions'">
           <a-space>
-            <a-button size="small" @click="openModal(record)">编辑</a-button>
+            <a-button size="small" @click="openModal(record)">
+              <template #icon>
+                <EditOutlined />
+              </template>
+              编辑
+            </a-button>
             <a-popconfirm title="确认删除？" @confirm="handleDelete(record.flight_id)">
-              <a-button size="small" danger>删除</a-button>
+              <a-button size="small" danger>
+                <template #icon>
+                  <DeleteOutlined />
+                </template>
+                删除
+              </a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -71,6 +91,7 @@ import {
   updateFlight,
   deleteFlight,
 } from "@/api/resources";
+import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons-vue";
 
 interface Flight {
   flight_id?: number;
@@ -178,4 +199,75 @@ const handleDelete = async (id: number) => {
 
 onMounted(loadData);
 </script>
+
+<style scoped>
+/* 自定义按钮样式 */
+:deep(.ant-btn-primary) {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  border-radius: 6px;
+}
+:deep(.ant-btn-primary:hover) {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+}
+:deep(.ant-btn) {
+  border-radius: 6px;
+}
+/* 自定义表格样式 */
+:deep(.ant-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+:deep(.ant-table-thead > tr > th) {
+  background-color: var(--bg-tertiary) !important;
+  color: var(--text-primary);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-color);
+}
+:deep(.ant-table-tbody > tr:hover > td) {
+  background-color: var(--bg-secondary) !important;
+}
+:deep(.ant-table-pagination) {
+  margin-top: 24px;
+}
+/* 自定义模态框样式 */
+:deep(.ant-modal-header) {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+:deep(.ant-modal-title) {
+  color: white !important;
+}
+:deep(.ant-modal-content) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+:deep(.ant-input),
+:deep(.ant-select-selector),
+:deep(.ant-picker) {
+  border-radius: 6px;
+}
+:deep(.ant-input:hover),
+:deep(.ant-select-selector:hover),
+:deep(.ant-picker:hover) {
+  border-color: var(--primary-light) !important;
+}
+:deep(.ant-input-focused),
+:deep(.ant-select-focused .ant-select-selector),
+:deep(.ant-picker-focused) {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+/* 自定义确认对话框样式 */
+:deep(.ant-popconfirm .ant-btn-primary) {
+  background-color: var(--error-color) !important;
+  border-color: var(--error-color) !important;
+}
+:deep(.ant-popconfirm .ant-btn-primary:hover) {
+  background-color: #cf1322 !important;
+  border-color: #cf1322 !important;
+}
+</style>
 

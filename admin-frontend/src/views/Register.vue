@@ -7,14 +7,22 @@
             v-model:value="form.username" 
             placeholder="请输入用户名（3-50个字符）" 
             :maxlength="50"
-          />
+          >
+            <template #prefix>
+              <UserOutlined />
+            </template>
+          </a-input>
         </a-form-item>
         <a-form-item label="密码">
           <a-input-password 
             v-model:value="form.password" 
             placeholder="请输入密码（至少6个字符，包含字母和数字）" 
             :maxlength="50"
-          />
+          >
+            <template #prefix>
+              <LockOutlined />
+            </template>
+          </a-input-password>
           <div v-if="form.password && !isPasswordStrong(form.password)" class="validation-tip">
             密码强度较弱，建议包含字母和数字
           </div>
@@ -23,26 +31,42 @@
           <a-input 
             v-model:value="form.email" 
             placeholder="请输入邮箱（选填）" 
-          />
+          >
+            <template #prefix>
+              <MailOutlined />
+            </template>
+          </a-input>
         </a-form-item>
         <a-form-item label="手机号">
           <a-input 
             v-model:value="form.phone" 
             placeholder="请输入手机号（选填）" 
-          />
+          >
+            <template #prefix>
+              <PhoneOutlined />
+            </template>
+          </a-input>
         </a-form-item>
         <a-form-item label="真实姓名" required>
           <a-input 
             v-model:value="form.real_name" 
             placeholder="请输入真实姓名" 
-          />
+          >
+            <template #prefix>
+              <UserOutlined />
+            </template>
+          </a-input>
         </a-form-item>
         <a-form-item label="身份证号" required>
           <a-input 
             v-model:value="form.id_card" 
             placeholder="请输入18位身份证号" 
             :maxlength="18"
-          />
+          >
+            <template #prefix>
+              <IdcardOutlined />
+            </template>
+          </a-input>
         </a-form-item>
         <a-button type="primary" block :loading="loading" @click="handleSubmit">
           注册
@@ -62,6 +86,7 @@ import { reactive, ref } from "vue";
 import { message } from "ant-design-vue";
 import { useRouter } from "vue-router";
 import { registerApi } from "@/api/auth";
+import { UserOutlined, LockOutlined, MailOutlined, PhoneOutlined, IdcardOutlined } from "@ant-design/icons-vue";
 
 const router = useRouter();
 const loading = ref(false);
@@ -149,20 +174,52 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top, #e0f2fe, #f8fafc 60%);
+  background: radial-gradient(circle at top, var(--primary-light), var(--bg-secondary) 60%);
   padding: 20px;
 }
 .register-card {
   width: 420px;
+  box-shadow: var(--shadow-lg);
+  border-radius: 12px;
+  overflow: hidden;
 }
 .register-actions {
   margin-top: 16px;
   text-align: center;
 }
 .validation-tip {
-  color: #faad14;
+  color: var(--warning-color);
   font-size: 12px;
   margin-top: 4px;
 }
-
+/* 自定义卡片和表单样式 */
+:deep(.ant-card-head) {
+  background: var(--primary-color);
+  color: white;
+}
+:deep(.ant-card-head-title) {
+  color: white;
+}
+:deep(.ant-btn-primary) {
+  background-color: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  border-radius: 6px;
+}
+:deep(.ant-btn-primary:hover) {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+}
+:deep(.ant-input-affix-wrapper),
+:deep(.ant-input) {
+  border-radius: 6px;
+}
+:deep(.ant-input-affix-wrapper:hover),
+:deep(.ant-input:hover) {
+  border-color: var(--primary-light) !important;
+}
+:deep(.ant-input-affix-wrapper-focused),
+:deep(.ant-input-focused) {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
 </style>

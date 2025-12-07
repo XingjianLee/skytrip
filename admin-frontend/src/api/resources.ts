@@ -37,3 +37,6 @@ export const deleteNotification = (id: number) =>
 export const fetchFinancialReport = (params: { start_date: string; end_date: string }) =>
   http.get("/api/v1/reports/financial", { params });
 
+export const exportFinancialReportPDF = (params: { start_date: string; end_date: string }) =>
+  http.get("/api/v1/reports/financial/pdf", { params, responseType: "blob" });
+
