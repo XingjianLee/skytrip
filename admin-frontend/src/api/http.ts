@@ -17,7 +17,15 @@ http.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
-      window.location.href = "/login";
+      localStorage.removeItem("userRole");
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith("/agency")) {
+        window.location.href = "/agency/login";
+      } else if (currentPath.startsWith("/admin")) {
+        window.location.href = "/admin/login";
+      } else {
+        window.location.href = "/";
+      }
     }
     return Promise.reject(error);
   },

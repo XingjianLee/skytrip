@@ -1,42 +1,189 @@
 :root {
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  /* 主色调：蓝色系 - 代表天空和专业 */
-  --primary-color: #1890ff;
-  --primary-dark: #096dd9;
-  --primary-light: #40a9ff;
-  /* 辅助色：绿色系 - 代表自然和景点 */
-  --secondary-color: #52c41a;
-  --secondary-dark: #389e0d;
-  /* 强调色：橙色系 - 代表活力和温暖 */
-  --accent-color: #fa8c16;
-  --accent-dark: #d46b08;
-  /* 中性色 */
+  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  
+  /* Wing Quest Suite 风格 - 现代航空主题配色 */
+  /* 主色调：深蓝紫渐变 - 代表天空和科技感 */
+  --primary-color: #6366f1;
+  --primary-dark: #4f46e5;
+  --primary-darker: #4338ca;
+  --primary-light: #818cf8;
+  --primary-lighter: #a5b4fc;
+  --primary-lightest: #e0e7ff;
+  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  --primary-gradient-subtle: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+  
+  /* 辅助色：青绿色系 - 代表活力和成长 */
+  --secondary-color: #06b6d4;
+  --secondary-dark: #0891b2;
+  --secondary-light: #22d3ee;
+  --secondary-gradient: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  
+  /* 强调色：粉紫色系 - 代表创新和活力 */
+  --accent-color: #ec4899;
+  --accent-dark: #db2777;
+  --accent-light: #f472b6;
+  --accent-gradient: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+  
+  /* 中性色 - 现代深色主题友好 */
   --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-light: #94a3b8;
+  --text-secondary: #475569;
+  --text-light: #64748b;
+  --text-lighter: #94a3b8;
+  --text-white: #ffffff;
+  
+  /* 背景色 - 现代玻璃态风格 */
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
-  --border-color: #e2e8f0;
-  --success-color: #52c41a;
-  --warning-color: #faad14;
-  --error-color: #f5222d;
-  /* 阴影 */
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-glass-dark: rgba(15, 23, 42, 0.7);
+  --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --bg-gradient-light: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  
+  /* 边框色 */
+  --border-color: rgba(226, 232, 240, 0.8);
+  --border-light: rgba(241, 245, 249, 0.8);
+  --border-primary: rgba(99, 102, 241, 0.3);
+  
+  /* 状态色 */
+  --success-color: #10b981;
+  --success-light: #34d399;
+  --warning-color: #f59e0b;
+  --warning-light: #fbbf24;
+  --error-color: #ef4444;
+  --error-light: #f87171;
+  --info-color: #3b82f6;
+  --info-light: #60a5fa;
+  
+  /* 阴影 - 增强深度感 */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  /* 当前配色变量 */
-  color: var(--text-primary);
-  background-color: var(--bg-secondary);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  --shadow-primary: 0 10px 25px -5px rgba(99, 102, 241, 0.3);
+  --shadow-primary-lg: 0 20px 40px -10px rgba(99, 102, 241, 0.4);
+  
+  /* 圆角 - 更圆润现代 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-full: 9999px;
+  
+  /* 动画时长 */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* 模糊效果 - 玻璃态 */
+  --blur-sm: blur(4px);
+  --blur-md: blur(8px);
+  --blur-lg: blur(16px);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body, html, #app {
   margin: 0;
   padding: 0;
   height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--bg-gradient-light);
+  background-attachment: fixed;
 }
 
 .full-height {
   min-height: 100vh;
+}
+
+/* 全局动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-base);
+}
+
+.slide-in {
+  animation: slideIn var(--transition-base);
+}
+
+/* 玻璃态效果工具类 */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border-color);
+}
+
+.glass-dark {
+  background: var(--bg-glass-dark);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 渐变文字 */
+.gradient-text {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+  transition: all var(--transition-base);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
 }
 

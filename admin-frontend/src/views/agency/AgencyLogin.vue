@@ -1,9 +1,9 @@
 <template>
   <div class="login-page">
-    <a-card class="login-card" title="SkyTrip 管理后台" bordered>
+    <a-card class="login-card" title="SkyTrip 旅行社端" bordered>
       <a-form layout="vertical" @submit.prevent="handleSubmit">
         <a-form-item label="用户名">
-          <a-input v-model:value="form.username" placeholder="输入管理员账号">
+          <a-input v-model:value="form.username" placeholder="输入旅行社账号">
             <template #prefix>
               <UserOutlined />
             </template>
@@ -16,12 +16,12 @@
             </template>
           </a-input-password>
         </a-form-item>
-        <a-button type="primary" block :loading="auth.loading" @click="handleSubmit">
+        <a-button type="primary" block :loading="loading" @click="handleSubmit">
           登录
         </a-button>
         <div class="login-actions">
-          <a-button text @click="router.push('/register')">
-            没有账号？立即注册
+          <a-button text @click="router.push('/agency/register')">
+            没有账号？旅行社注册
           </a-button>
         </div>
       </a-form>
@@ -30,14 +30,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import { message } from "ant-design-vue";
 import { useRouter } from "vue-router";
-import { useAuthStore } from "@/store/auth";
 import { UserOutlined, LockOutlined } from "@ant-design/icons-vue";
+import http from "@/api/http";
 
 const router = useRouter();
-const auth = useAuthStore();
+const loading = ref(false);
 
 const form = reactive({
   username: "",
@@ -48,14 +48,21 @@ const handleSubmit = async () => {
   if (!form.username || !form.password) {
     return message.warning("请输入账号密码");
   }
+  loading.value = true;
   try {
-    await auth.login(form.username, form.password);
-    // 设置管理员角色
-    localStorage.setItem("userRole", "admin");
+    const response: any = await http.post("/api/v1/agency/login", {
+      username: form.username,
+      password: form.password,
+    });
+    const token = response.access_token;
+    localStorage.setItem("token", token);
+    localStorage.setItem("userRole", "agency");
     message.success("登录成功");
-    router.push("/admin/dashboard");
+    router.push("/agency/dashboard");
   } catch (error: any) {
     message.error(error?.response?.data?.detail || "登录失败");
+  } finally {
+    loading.value = false;
   }
 };
 </script>
@@ -80,7 +87,7 @@ const handleSubmit = async () => {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
   animation: pulse 4s ease-in-out infinite;
 }
 
@@ -97,13 +104,14 @@ const handleSubmit = async () => {
   z-index: 1;
   animation: fadeIn var(--transition-slow);
 }
+
 .login-actions {
   margin-top: 16px;
   text-align: center;
 }
-/* 自定义卡片和表单样式 - 现代渐变 */
+
 :deep(.ant-card-head) {
-  background: var(--primary-gradient);
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
   color: white;
   border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
   border: none;
@@ -130,58 +138,26 @@ const handleSubmit = async () => {
   position: relative;
   z-index: 1;
 }
+
 :deep(.ant-btn-primary) {
-  background: var(--primary-gradient) !important;
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
   border: none !important;
   border-radius: var(--radius-lg);
   height: 44px;
   font-weight: 600;
   font-size: 16px;
-  box-shadow: var(--shadow-primary);
+  box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.3);
   transition: all var(--transition-base);
   letter-spacing: 0.5px;
 }
+
 :deep(.ant-btn-primary:hover) {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-primary-lg);
+  box-shadow: 0 20px 40px -10px rgba(6, 182, 212, 0.4);
   filter: brightness(1.1);
 }
-:deep(.ant-btn-primary:active) {
-  transform: translateY(0);
-  box-shadow: var(--shadow-primary);
-}
-:deep(.ant-btn-text) {
-  color: var(--primary-color) !important;
-}
-:deep(.ant-btn-text:hover) {
-  color: var(--primary-dark) !important;
-  background-color: var(--primary-lightest) !important;
-}
-:deep(.ant-input-affix-wrapper) {
-  border-radius: var(--radius-lg);
-  height: 44px;
-  border: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: var(--blur-sm);
-  -webkit-backdrop-filter: var(--blur-sm);
-  color: var(--text-primary);
-  transition: all var(--transition-base);
-  display: flex;
-  align-items: center;
-  padding: 0 11px;
-  box-sizing: border-box;
-}
 
-:deep(.ant-input-affix-wrapper .ant-input) {
-  border: none;
-  background: transparent;
-  padding: 0;
-  height: auto;
-  line-height: 22px;
-  box-sizing: border-box;
-  flex: 1;
-}
-
+:deep(.ant-input-affix-wrapper),
 :deep(.ant-input) {
   border-radius: var(--radius-lg);
   height: 44px;
@@ -191,9 +167,17 @@ const handleSubmit = async () => {
   -webkit-backdrop-filter: var(--blur-sm);
   color: var(--text-primary);
   transition: all var(--transition-base);
-  padding: 4px 11px;
-  box-sizing: border-box;
-  line-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+:deep(.ant-input-affix-wrapper .ant-input),
+:deep(.ant-input-affix-wrapper input) {
+  height: 100%;
+  line-height: 42px;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 :deep(.ant-input-affix-wrapper .ant-input-prefix) {
@@ -201,7 +185,7 @@ const handleSubmit = async () => {
   align-items: center;
   justify-content: center;
   margin-right: 8px;
-  flex-shrink: 0;
+  height: 100%;
 }
 
 :deep(.ant-input-affix-wrapper .ant-input-prefix svg) {
@@ -211,49 +195,28 @@ const handleSubmit = async () => {
   display: inline-block;
 }
 
-:deep(.ant-input-affix-wrapper:hover) {
-  border-color: var(--primary-light) !important;
-  box-shadow: var(--shadow-md);
-  background: rgba(255, 255, 255, 1);
+:deep(.ant-input-password) {
+  display: flex;
+  align-items: center;
 }
 
+:deep(.ant-input-password .ant-input) {
+  height: 100%;
+  line-height: 42px;
+}
+
+:deep(.ant-input-affix-wrapper:hover),
 :deep(.ant-input:hover) {
-  border-color: var(--primary-light) !important;
+  border-color: #06b6d4 !important;
   box-shadow: var(--shadow-md);
   background: rgba(255, 255, 255, 1);
 }
 
-:deep(.ant-input-affix-wrapper-focused) {
-  border-color: var(--primary-color) !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
-  background: rgba(255, 255, 255, 1);
-}
-
+:deep(.ant-input-affix-wrapper-focused),
 :deep(.ant-input-focused) {
-  border-color: var(--primary-color) !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15) !important;
+  border-color: #06b6d4 !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15) !important;
   background: rgba(255, 255, 255, 1);
-}
-
-:deep(.ant-input-affix-wrapper-focused .ant-input-prefix svg) {
-  color: var(--primary-color);
-}
-
-:deep(.ant-input::placeholder) {
-  color: var(--text-secondary);
-}
-
-:deep(.ant-form-item) {
-  margin-bottom: 20px;
-}
-
-:deep(.ant-form-item-label) {
-  padding-bottom: 8px;
-}
-
-:deep(.ant-form-item-label > label) {
-  font-weight: 500;
-  color: var(--text-primary);
 }
 </style>
 
