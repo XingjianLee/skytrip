@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
-from datetime import date, datetime
+from datetime import datetime, date
 
 # Shared properties
 class UserBase(BaseModel):
@@ -21,16 +21,19 @@ class UserCreate(BaseModel):
 # Properties to receive via API on update
 class UserUpdate(UserBase):
     password: Optional[str] = None
-    phone: Optional[str] = None
     real_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
     avatar_url: Optional[str] = None
     bio: Optional[str] = None
-    vip_level: Optional[int] = None
-    vip_expire_date: Optional[date] = None
+    id_issue_date: Optional[date] = None
+    id_expiry_date: Optional[date] = None
+    id_issuer: Optional[str] = None
 
 class UserInDBBase(UserBase):
     id: int
     username: str
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     real_name: Optional[str] = None
     id_card: Optional[str] = None
@@ -40,6 +43,9 @@ class UserInDBBase(UserBase):
     vip_expire_date: Optional[date] = None
     role: Optional[str] = None
     agency_id: Optional[int] = None
+    id_issue_date: Optional[date] = None
+    id_expiry_date: Optional[date] = None
+    id_issuer: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
@@ -51,7 +57,7 @@ class User(UserInDBBase):
 # Additional properties stored in DB
 class UserInDB(UserBase):
     id: int
-    password: str
+    hashed_password: str
 
     class Config:
         orm_mode = True

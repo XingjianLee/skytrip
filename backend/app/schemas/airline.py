@@ -1,9 +1,11 @@
 from pydantic import BaseModel
+from pydantic import ConfigDict
 
 
 class AirlineBase(BaseModel):
-    name: str
-    iata_code: str
+    airline_code: str
+    airline_name: str
+    country: str
 
 
 class AirlineCreate(AirlineBase):
@@ -15,10 +17,7 @@ class AirlineUpdate(AirlineBase):
 
 
 class Airline(AirlineBase):
-    id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AirlineWithFlights(Airline):

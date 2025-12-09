@@ -5,6 +5,9 @@ from sqlalchemy import and_, or_, func
 from app.crud.base import CRUDBase
 from app.models.order import Order, OrderItem, OrderStatus, PaymentStatus, CheckInStatus, TicketStatus
 from app.schemas.order import OrderCreate, OrderUpdate
+from app.models.flight import Flight
+from app.models.route import Route
+from app.models.airport import Airport
 
 
 class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
@@ -31,9 +34,14 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
     
     def get_with_items(self, db: Session, order_id: int) -> Optional[Order]:
         """获取包含订单项的订单"""
+        from app.models.flight import Flight
+        from app.models.route import Route
+        from app.models.airport import Airport
         return db.query(Order).options(
             joinedload(Order.items).joinedload(OrderItem.passenger),
-            joinedload(Order.items).joinedload(OrderItem.flight)
+            joinedload(Order.items).joinedload(OrderItem.flight).joinedload(Flight.route).joinedload(Route.departure_airport),
+            joinedload(Order.items).joinedload(OrderItem.flight).joinedload(Flight.route).joinedload(Route.arrival_airport),
+            joinedload(Order.items).joinedload(OrderItem.flight).joinedload(Flight.airline),
         ).filter(Order.order_id == order_id).first()
     
     def get_user_orders_with_items(
@@ -47,7 +55,9 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         """获取用户的订单列表（包含订单项）"""
         return db.query(Order).options(
             joinedload(Order.items).joinedload(OrderItem.passenger),
-            joinedload(Order.items).joinedload(OrderItem.flight)
+            joinedload(Order.items).joinedload(OrderItem.flight).joinedload(Flight.route).joinedload(Route.departure_airport),
+            joinedload(Order.items).joinedload(OrderItem.flight).joinedload(Flight.route).joinedload(Route.arrival_airport),
+            joinedload(Order.items).joinedload(OrderItem.flight).joinedload(Flight.airline),
         ).filter(Order.user_id == user_id).offset(skip).limit(limit).all()
     
     def get_orders_by_date_range(

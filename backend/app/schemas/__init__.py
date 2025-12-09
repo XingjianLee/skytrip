@@ -28,7 +28,7 @@ from .passenger import (
 from .order import (
     Order, OrderCreate, OrderUpdate, OrderWithItems,
     OrderItem, OrderItemCreate, OrderItemWithDetails,
-    OrderPayment, OrderQuery, OrderSummary,
+    OrderPayment, OrderQuery, OrderSummary, OrderStats,
     PaymentMethod, PaymentStatus, OrderStatus, CheckInStatus, TicketStatus
 )
 from .check_in import (
@@ -66,7 +66,7 @@ __all__ = [
     # Order schemas
     "Order", "OrderCreate", "OrderUpdate", "OrderWithItems",
     "OrderItem", "OrderItemCreate", "OrderItemWithDetails",
-    "OrderPayment", "OrderQuery", "OrderSummary",
+    "OrderPayment", "OrderQuery", "OrderSummary", "OrderStats",
     "PaymentMethod", "PaymentStatus", "OrderStatus", "CheckInStatus", "TicketStatus",
     
     # Check-in schemas

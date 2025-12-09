@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plane, Clock, Wifi, Utensils, Tv, MapPin } from "lucide-react";
 
-type CabinType = "economy" | "business" | "first";
+type CabinType = "economy" | "business" | "first" | "all";
 type SelectedCabin = "all" | CabinType;
 
 interface FlightCardProps {
@@ -13,7 +13,6 @@ interface FlightCardProps {
 
 export default function FlightCard({ flight, selectedCabin = "all" }: FlightCardProps) {
   const navigate = useNavigate();
-  const resolveCabin = (sc: SelectedCabin): CabinType => (sc === "all" ? "economy" : sc);
 
   const facilityIcons = {
     wifi: <Wifi className="h-4 w-4" />,
@@ -102,7 +101,7 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
                 ))}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {(["economy", "business", "first"] as CabinType[]).map((cabin) => (
+                {["economy", "business", "first"].map((cabin) => (
                   <div key={cabin} className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <div className="text-sm font-medium text-foreground">
@@ -110,10 +109,10 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
                         {cabin === "business" && "商务舱"}
                         {cabin === "first" && "头等舱"}
                       </div>
-                      <div className="text-xs text-muted-foreground">剩余 {flight.availabilityMap?.[cabin] ?? flight.seats}</div>
+                      <div className="text-xs text-muted-foreground">剩余 {flight.availabilityMap?.[cabin as CabinType] ?? flight.seats}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xl font-bold text-accent">¥{flight.pricingMap?.[cabin] ?? flight.price}</div>
+                      <div className="text-xl font-bold text-accent">¥{flight.pricingMap?.[cabin as CabinType] ?? flight.price}</div>
                       <div className="text-xs text-muted-foreground">含税费</div>
                     </div>
                   </div>
@@ -138,7 +137,8 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
                   </div>
                 ))}
                 {(() => {
-                  const currentCabin = resolveCabin(selectedCabin);
+                  const isSpecific = selectedCabin !== "all";
+                  const currentCabin: CabinType = isSpecific ? (selectedCabin as CabinType) : "economy";
                   const seats = flight.availabilityMap?.[currentCabin] ?? flight.seats;
                   return (
                     <span className="text-sm text-muted-foreground ml-2">剩余 {seats} 座</span>
@@ -149,7 +149,8 @@ export default function FlightCard({ flight, selectedCabin = "all" }: FlightCard
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   {(() => {
-                    const currentCabin = resolveCabin(selectedCabin);
+                    const isSpecific = selectedCabin !== "all";
+                    const currentCabin: CabinType = isSpecific ? (selectedCabin as CabinType) : "economy";
                     const price = flight.pricingMap?.[currentCabin] ?? flight.price;
                     return (
                       <div className="text-3xl font-bold text-accent">¥{price}</div>

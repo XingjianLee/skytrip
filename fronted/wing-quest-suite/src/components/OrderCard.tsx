@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plane, Calendar, User, CreditCard, MapPin, Clock, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 export interface OrderPassenger {
   name: string;
@@ -58,6 +59,7 @@ export interface TicketOrderItem {
 export type OrderItem = FlightOrderItem | HotelOrderItem | TicketOrderItem;
 
 export interface Order {
+  orderId: number;
   orderNo: string;
   totalAmountOriginal: number;
   totalAmount: number;
@@ -105,7 +107,7 @@ const paymentMethodLabels = {
 
 const OrderCard = ({ order, onViewDetails }: OrderCardProps) => {
   const mainItem = order.items[0];
-  
+
   const getTotalPeople = () => {
     return order.items.reduce((sum, item) => {
       if (item.type === "flight") return sum + item.passengers.length;
@@ -127,7 +129,7 @@ const OrderCard = ({ order, onViewDetails }: OrderCardProps) => {
                   <div className="text-xs text-muted-foreground">{mainItem.departureAirport}</div>
                   <div className="text-sm">{format(mainItem.departureTime, "HH:mm", { locale: zhCN })}</div>
                 </div>
-                
+
                 <div className="flex flex-col items-center px-4">
                   <Plane className="w-5 h-5 text-primary mb-1" />
                   <div className="text-xs text-muted-foreground">{mainItem.flightNumber}</div>
@@ -213,6 +215,7 @@ const OrderCard = ({ order, onViewDetails }: OrderCardProps) => {
     }
   };
 
+  const navigate = useNavigate();
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="pb-3">
@@ -265,13 +268,14 @@ const OrderCard = ({ order, onViewDetails }: OrderCardProps) => {
       <CardFooter className="flex gap-2 justify-end">
         {order.paymentStatus === "unpaid" && order.status === "pending" && (
           <>
-            <Button variant="outline" size="sm">取消订单</Button>
-            <Button size="sm">立即支付</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate("/cancel-order", { state: { orderId: order.orderId } })}>取消订单</Button>
+            <Button size="sm" onClick={() => navigate("/payment", { state: { orderData: { orderId: order.orderId, orderNo: order.orderNo, total: order.totalAmount } } })}>立即支付</Button>
           </>
         )}
         {order.paymentStatus === "paid" && (
           <Button variant="outline" size="sm">申请退款</Button>
         )}
+        <Button variant="outline" size="sm" onClick={() => navigate("/check-in", { state: { orderId: order.orderId } })}>在线值机</Button>
         <Button variant="ghost" size="sm" onClick={() => onViewDetails(order)}>
           查看详情 <ChevronRight className="w-4 h-4 ml-1" />
         </Button>

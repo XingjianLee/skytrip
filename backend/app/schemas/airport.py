@@ -1,9 +1,10 @@
 from pydantic import BaseModel
+from pydantic import ConfigDict
 
 
 class AirportBase(BaseModel):
-    name: str
-    iata_code: str
+    airport_code: str
+    airport_name: str
     city: str
     country: str
 
@@ -17,10 +18,7 @@ class AirportUpdate(AirportBase):
 
 
 class Airport(AirportBase):
-    id: int
-
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AirportWithRoutes(Airport):

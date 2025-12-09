@@ -1,10 +1,14 @@
 from typing import List, Optional, Any
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException, Query
+import re
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, and_
 
 from ... import dependencies as deps
 from ... import crud, schemas, models
+from ...crud.order import order_item as order_item_crud
+from ...crud.order import order_item as order_item_crud
 
 router = APIRouter()
 
@@ -23,38 +27,21 @@ def list_orders(
     """
     获取当前用户的订单列表
     """
+    # 一次性加载订单及其订单项与航班详情，避免多次查询导致的异常
+    orders = crud.order.get_user_orders_with_items(db, user_id=current_user.id, skip=skip, limit=limit)
+
+    # 过滤条件（在内存中按枚举值进行比对）
+    def to_val(x):
+        return x.value if hasattr(x, 'value') else str(x)
+
     if status:
-        # 仅返回当前用户的订单并按状态筛选
-        orders_all = crud.order.get_by_user(db, user_id=current_user.id)
-        orders = [
-            o for o in orders_all
-            if (o.status.value if hasattr(o.status, 'value') else str(o.status)) == status.value
-        ]
-    elif payment_status:
-        # 仅返回当前用户的订单并按支付状态筛选
-        orders_all = crud.order.get_by_user(db, user_id=current_user.id)
-        orders = [
-            o for o in orders_all
-            if (o.payment_status.value if hasattr(o.payment_status, 'value') else str(o.payment_status)) == payment_status.value
-        ]
-    elif start_date and end_date:
-        orders = crud.order.get_orders_by_date_range(
-            db,
-            start_date=start_date,
-            end_date=end_date,
-            user_id=current_user.id
-        )
-    else:
-        orders = crud.order.get_by_user(db, user_id=current_user.id)
-    
-    # 获取包含订单项的订单信息
-    orders_with_items = []
-    for order in orders[skip:skip + limit]:
-        order_with_items = crud.order.get_with_items(db, order_id=order.order_id)
-        if order_with_items:
-            orders_with_items.append(order_with_items)
-    
-    return orders_with_items
+        orders = [o for o in orders if to_val(o.status) == status.value]
+    if payment_status:
+        orders = [o for o in orders if to_val(o.payment_status) == payment_status.value]
+    if start_date and end_date:
+        orders = [o for o in orders if (o.created_at.date() >= start_date and o.created_at.date() <= end_date)]
+
+    return orders
 
 
 @router.get("/{order_id}", response_model=schemas.OrderWithItems)
@@ -256,15 +243,63 @@ def update_payment_status(
     return crud.order.get_with_items(db, order_id=order_id)
 
 
+@router.get("/{order_id}/cancel/preview")
+def cancel_preview(
+    *,
+    db: Session = Depends(deps.get_db),
+    order_id: int,
+    flight_date: date,
+    current_user: models.User = Depends(deps.get_current_active_user)
+) -> Any:
+    """
+    取消费用预览：根据所选航班日期判断是否收取 10% 手续费（距起飞 <24h），并校验运营掩码
+    """
+    order = crud.order.get_with_items(db, order_id=order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权访问此订单")
+
+    from datetime import datetime
+    now = datetime.utcnow()
+    penalty_total = 0.0
+    refund_total = 0.0
+    items = []
+    for it in order.items:
+        flight = it.flight
+        if not flight:
+            continue
+        day_diff = (flight_date - now.date()).days
+        if day_diff < 0 or day_diff >= 21:
+            raise HTTPException(status_code=400, detail="航班日期不在运营掩码范围内")
+        if flight.operating_days[day_diff] != '1':
+            raise HTTPException(status_code=400, detail="所选日期航班未运营")
+        dep_dt = datetime.combine(flight_date, flight.scheduled_departure_time)
+        within_24h = (dep_dt - now).total_seconds() < 24 * 3600
+        paid = float(it.paid_price)
+        penalty = paid * 0.10 if within_24h and paid > 0 else 0.0
+        refund = paid - penalty if paid > 0 else 0.0
+        penalty_total += penalty
+        refund_total += refund
+        items.append({
+            "item_id": it.item_id,
+            "paid_price": paid,
+            "penalty": penalty,
+            "refund": refund,
+        })
+
+    return {"penalty_total": penalty_total, "refund_total": refund_total, "items": items}
+
 @router.put("/{order_id}/cancel", response_model=schemas.OrderWithItems)
 def cancel_order(
     *,
     db: Session = Depends(deps.get_db),
     order_id: int,
+    flight_date: Optional[date] = Query(None, description="航班日期，用于手续费计算与运营掩码校验"),
     current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
-    取消订单
+    取消订单，可选按航班日期计算 24 小时内的手续费（10%）并校验运营掩码
     """
     order = crud.order.get(db, id=order_id)
     if not order:
@@ -278,10 +313,86 @@ def cancel_order(
     if order.status not in [schemas.OrderStatus.PENDING, schemas.OrderStatus.PAID]:
         raise HTTPException(status_code=400, detail="订单状态无法取消")
 
+    order_with_items = crud.order.get_with_items(db, order_id=order_id)
+    if not order_with_items:
+        raise HTTPException(status_code=404, detail="订单不存在")
+
+    # 仅当提供 flight_date 时进行掩码与 24h 校验（当前返回体不含汇总，计算仅用于业务规则判断）
+    from datetime import datetime
+    now = datetime.utcnow()
+    if flight_date is not None:
+        for it in order_with_items.items:
+            flight = it.flight
+            if not flight:
+                continue
+            day_diff = (flight_date - now.date()).days
+            if day_diff < 0 or day_diff >= 21:
+                raise HTTPException(status_code=400, detail="航班日期不在运营掩码范围内")
+            if flight.operating_days[day_diff] != '1':
+                raise HTTPException(status_code=400, detail="所选日期航班未运营")
+            # 起飞时间
+            dep_dt = datetime.combine(flight_date, flight.scheduled_departure_time)
+            _ = (dep_dt - now).total_seconds() < 24 * 3600  # 计算结果若需落库，可在此扩展
+
+    # 更新订单状态
     cancelled = crud.order.cancel_order(db, order_id=order_id)
     if not cancelled:
         raise HTTPException(status_code=500, detail="取消订单失败")
+
     return crud.order.get_with_items(db, order_id=order_id)
+
+
+@router.get("/stats/me", response_model=schemas.OrderStats)
+def get_order_stats(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user)
+) -> Any:
+    """
+    获取当前用户的订单统计：总数、待支付、已支付、已完成、累计消费
+    """
+    now = datetime.utcnow()
+    OrderModel = models.order.Order
+    PaymentStatus = models.order.PaymentStatus
+    OrderStatus = models.order.OrderStatus
+
+    total_orders = db.query(func.count(OrderModel.order_id)).filter(OrderModel.user_id == current_user.id).scalar() or 0
+
+    unpaid_count = db.query(func.count(OrderModel.order_id)).filter(
+        OrderModel.user_id == current_user.id,
+        OrderModel.payment_status == PaymentStatus.UNPAID.value,
+        OrderModel.status == OrderStatus.PENDING.value,
+        or_(OrderModel.expired_at.is_(None), OrderModel.expired_at > now)
+    ).scalar() or 0
+
+    paid_count = db.query(func.count(OrderModel.order_id)).filter(
+        OrderModel.user_id == current_user.id,
+        OrderModel.payment_status == PaymentStatus.PAID.value
+    ).scalar() or 0
+
+    completed_count = db.query(func.count(OrderModel.order_id)).filter(
+        OrderModel.user_id == current_user.id,
+        OrderModel.status == OrderStatus.COMPLETED.value
+    ).scalar() or 0
+
+    cancelled_count = db.query(func.count(OrderModel.order_id)).filter(
+        OrderModel.user_id == current_user.id,
+        OrderModel.status == OrderStatus.CANCELLED.value
+    ).scalar() or 0
+
+    total_spent = db.query(func.coalesce(func.sum(OrderModel.total_amount), 0)).filter(
+        OrderModel.user_id == current_user.id,
+        OrderModel.payment_status == PaymentStatus.PAID.value
+    ).scalar() or 0.0
+
+    return schemas.OrderStats(
+        total_orders=total_orders,
+        unpaid_count=unpaid_count,
+        paid_count=paid_count,
+        completed_count=completed_count,
+        cancelled_count=cancelled_count,
+        total_spent=float(total_spent),
+    )
 
 
 @router.get("/{order_id}/items", response_model=List[schemas.OrderItemWithDetails])
@@ -313,12 +424,13 @@ def update_check_in_status(
     db: Session = Depends(deps.get_db),
     item_id: int,
     check_in_status: schemas.CheckInStatus,
+    seat_number: Optional[str] = Query(None, description="座位号"),
     current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
     更新订单项的值机状态
     """
-    order_item = crud.order_item.get(db, id=item_id)
+    order_item = order_item_crud.get(db, id=item_id)
     if not order_item:
         raise HTTPException(status_code=404, detail="订单项不存在")
     
@@ -327,11 +439,44 @@ def update_check_in_status(
     if not order or order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权修改此订单项")
     
-    order_item = crud.order_item.update_check_in_status(
-        db, 
-        item_id=item_id, 
-        check_in_status=check_in_status
-    )
+    if seat_number is not None:
+        sn = seat_number.upper().strip()
+        if not re.fullmatch(r"\d{1,2}[A-F]", sn):
+            raise HTTPException(status_code=400, detail="座位号格式错误")
+        try:
+            row = int(sn[:-1])
+            col = sn[-1]
+        except Exception:
+            raise HTTPException(status_code=400, detail="座位号格式错误")
+        cabin = str(order_item.cabin_class)
+        if cabin == "first":
+            if not (1 <= row <= 4 and col in {"A", "B"}):
+                raise HTTPException(status_code=400, detail="座位与舱位不匹配")
+        elif cabin == "business":
+            if not (5 <= row <= 10 and col in {"A", "B", "D", "E"}):
+                raise HTTPException(status_code=400, detail="座位与舱位不匹配")
+        else:
+            if not (11 <= row <= 30 and col in {"A", "B", "C", "D", "E", "F"}):
+                raise HTTPException(status_code=400, detail="座位与舱位不匹配")
+        existing = db.query(models.order.OrderItem).filter(
+            models.order.OrderItem.flight_id == order_item.flight_id,
+            models.order.OrderItem.seat_number == sn,
+            models.order.OrderItem.item_id != item_id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="座位已被占用")
+        order_item = order_item_crud.update_check_in_status(
+            db,
+            item_id=item_id,
+            check_in_status=check_in_status,
+            seat_number=sn,
+        )
+    else:
+        order_item = order_item_crud.update_check_in_status(
+            db,
+            item_id=item_id,
+            check_in_status=check_in_status,
+        )
     return order_item
 
 
@@ -346,7 +491,7 @@ def update_ticket_status(
     """
     更新订单项的票务状态
     """
-    order_item = crud.order_item.get(db, id=item_id)
+    order_item = order_item_crud.get(db, id=item_id)
     if not order_item:
         raise HTTPException(status_code=404, detail="订单项不存在")
     
@@ -355,7 +500,7 @@ def update_ticket_status(
     if not order or order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权修改此订单项")
     
-    order_item = crud.order_item.update_ticket_status(
+    order_item = order_item_crud.update_ticket_status(
         db, 
         item_id=item_id, 
         ticket_status=ticket_status

@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 from .passenger import PassengerBookingInfo, Passenger
+from .flight import FlightWithDetails
 from .flight import CabinClass
 
 
@@ -92,7 +93,7 @@ class OrderItem(OrderItemInDBBase):
 class OrderItemWithDetails(OrderItemInDBBase):
     """包含详细信息的订单明细模型"""
     passenger: Optional[Passenger] = None
-    # flight: Optional["Flight"] = None  # 避免循环导入
+    flight: Optional[FlightWithDetails] = None
 
 
 class OrderInDBBase(BaseModel):
@@ -157,3 +158,13 @@ class OrderSummary(BaseModel):
     passenger_count: int
     flight_count: int
     created_at: datetime
+
+
+class OrderStats(BaseModel):
+    """订单全局统计（按当前用户）"""
+    total_orders: int
+    unpaid_count: int
+    paid_count: int
+    completed_count: int
+    cancelled_count: int
+    total_spent: float

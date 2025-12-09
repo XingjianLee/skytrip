@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import OrderCard, { Order } from "@/components/OrderCard";
@@ -14,303 +14,69 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Receipt, Clock, CheckCircle2, XCircle, Wallet, ArrowUpDown, Plane, Hotel, Ticket } from "lucide-react";
+import { getOrderStats, getOrders, type BackendOrder } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock 订单数据 - 包含航班、酒店和门票
-const mockOrders: Order[] = [
-  {
-    orderNo: "ORD202510230001",
-    totalAmountOriginal: 2400.00,
-    totalAmount: 2280.00,
-    paymentStatus: "paid",
-    status: "paid",
-    paymentMethod: "alipay",
-    createdAt: new Date(2024, 9, 23, 9, 25),
-    paidAt: new Date(2024, 9, 23, 9, 30),
-    items: [
-      {
-        type: "flight",
-        flightNumber: "CA1831",
-        airline: "中国国际航空",
-        departureAirport: "PEK",
-        departureCity: "北京",
-        arrivalAirport: "CTU",
-        arrivalCity: "成都",
-        departureTime: new Date(2024, 10, 25, 8, 0),
-        arrivalTime: new Date(2024, 10, 25, 10, 30),
-        cabinClass: "economy",
-        passengers: [
-          {
-            name: "李行健",
-            idCard: "130104200404250000",
-            seatNumber: "15C",
-            checkInStatus: "checked",
-          },
-          {
-            name: "张伟",
-            idCard: "110101199001011234",
-            seatNumber: "15D",
-            checkInStatus: "checked",
-          },
-        ],
-        originalPrice: 2400.00,
-        paidPrice: 2280.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510230002",
-    totalAmountOriginal: 4800.00,
-    totalAmount: 4560.00,
-    paymentStatus: "paid",
-    status: "completed",
-    paymentMethod: "wechat",
-    createdAt: new Date(2024, 9, 23, 10, 10),
-    paidAt: new Date(2024, 9, 23, 10, 15),
-    items: [
-      {
-        type: "hotel",
-        hotelName: "上海外滩华尔道夫酒店",
-        address: "上海市黄浦区中山东一路2号",
-        city: "上海",
-        checkInDate: new Date(2024, 10, 1),
-        checkOutDate: new Date(2024, 10, 4),
-        nights: 3,
-        roomType: "豪华江景套房",
-        guests: [
-          {
-            name: "李娜",
-            idCard: "110101198505152345",
-            checkInStatus: "not_checked",
-          },
-          {
-            name: "王芳",
-            idCard: "110101199212123456",
-            checkInStatus: "not_checked",
-          },
-        ],
-        originalPrice: 4800.00,
-        paidPrice: 4560.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510230003",
-    totalAmountOriginal: 890.00,
-    totalAmount: 890.00,
-    paymentStatus: "unpaid",
-    status: "pending",
-    paymentMethod: "unionpay",
-    createdAt: new Date(2024, 9, 23, 10, 50),
-    expiredAt: new Date(2024, 9, 23, 11, 20),
-    items: [
-      {
-        type: "ticket",
-        attractionName: "上海迪士尼乐园",
-        address: "上海市浦东新区川沙镇黄赵路310号",
-        city: "上海",
-        visitDate: new Date(2024, 10, 15),
-        ticketType: "一日通票",
-        quantity: 2,
-        visitors: [
-          {
-            name: "刘强",
-            idCard: "110101198811114567",
-            checkInStatus: "not_checked",
-          },
-          {
-            name: "刘小雨",
-            idCard: "110101201508201234",
-            checkInStatus: "not_checked",
-          },
-        ],
-        originalPrice: 890.00,
-        paidPrice: 890.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510220001",
-    totalAmountOriginal: 6200.00,
-    totalAmount: 6200.00,
-    paymentStatus: "paid",
-    status: "completed",
-    paymentMethod: "offline",
-    createdAt: new Date(2024, 9, 22, 16, 30),
-    paidAt: new Date(2024, 9, 22, 16, 40),
-    items: [
-      {
-        type: "flight",
-        flightNumber: "CA1298",
-        airline: "中国国际航空",
-        departureAirport: "URC",
-        departureCity: "乌鲁木齐",
-        arrivalAirport: "PEK",
-        arrivalCity: "北京",
-        departureTime: new Date(2024, 9, 26, 10, 0),
-        arrivalTime: new Date(2024, 9, 26, 14, 30),
-        cabinClass: "business",
-        passengers: [
-          {
-            name: "陈国强",
-            idCard: "110101198003035678",
-            seatNumber: "3C",
-            checkInStatus: "checked",
-          },
-          {
-            name: "张丽",
-            idCard: "110101199210108888",
-            seatNumber: "3D",
-            checkInStatus: "checked",
-          },
-        ],
-        originalPrice: 6200.00,
-        paidPrice: 6200.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510230005",
-    totalAmountOriginal: 2100.00,
-    totalAmount: 2100.00,
-    paymentStatus: "failed",
-    status: "cancelled",
-    paymentMethod: "credit_card",
-    createdAt: new Date(2024, 9, 23, 11, 30),
-    expiredAt: new Date(2024, 9, 23, 12, 0),
-    items: [
-      {
-        type: "flight",
-        flightNumber: "MU5302",
-        airline: "中国东方航空",
-        departureAirport: "PVG",
-        departureCity: "上海",
-        arrivalAirport: "CAN",
-        arrivalCity: "广州",
-        departureTime: new Date(2024, 10, 5, 14, 20),
-        arrivalTime: new Date(2024, 10, 5, 16, 40),
-        cabinClass: "economy",
-        passengers: [
-          {
-            name: "李行健",
-            idCard: "130104200404250000",
-            checkInStatus: "not_checked",
-          },
-        ],
-        originalPrice: 2100.00,
-        paidPrice: 2100.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510220002",
-    totalAmountOriginal: 3200.00,
-    totalAmount: 2880.00,
-    paymentStatus: "paid",
-    status: "completed",
-    paymentMethod: "wechat",
-    createdAt: new Date(2024, 9, 20, 14, 20),
-    paidAt: new Date(2024, 9, 20, 14, 25),
-    items: [
-      {
-        type: "hotel",
-        hotelName: "成都天府丽思卡尔顿酒店",
-        address: "成都市武侯区天府大道中段1366号",
-        city: "成都",
-        checkInDate: new Date(2024, 9, 28),
-        checkOutDate: new Date(2024, 9, 30),
-        nights: 2,
-        roomType: "行政客房",
-        guests: [
-          {
-            name: "张伟",
-            idCard: "110101199001011234",
-            checkInStatus: "not_checked",
-          },
-        ],
-        originalPrice: 3200.00,
-        paidPrice: 2880.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510190001",
-    totalAmountOriginal: 1560.00,
-    totalAmount: 1560.00,
-    paymentStatus: "paid",
-    status: "completed",
-    paymentMethod: "alipay",
-    createdAt: new Date(2024, 9, 18, 9, 10),
-    paidAt: new Date(2024, 9, 18, 9, 15),
-    items: [
-      {
-        type: "ticket",
-        attractionName: "故宫博物院",
-        address: "北京市东城区景山前街4号",
-        city: "北京",
-        visitDate: new Date(2024, 9, 25),
-        ticketType: "成人票",
-        quantity: 4,
-        visitors: [
-          {
-            name: "陈国强",
-            idCard: "110101198003035678",
-            checkInStatus: "not_checked",
-          },
-          {
-            name: "张丽",
-            idCard: "110101199210108888",
-            checkInStatus: "not_checked",
-          },
-          {
-            name: "李行健",
-            idCard: "130104200404250000",
-            checkInStatus: "not_checked",
-          },
-          {
-            name: "张伟",
-            idCard: "110101199001011234",
-            checkInStatus: "not_checked",
-          },
-        ],
-        originalPrice: 1560.00,
-        paidPrice: 1560.00,
-      },
-    ],
-  },
-  {
-    orderNo: "ORD202510180001",
-    totalAmountOriginal: 5400.00,
-    totalAmount: 5400.00,
-    paymentStatus: "paid",
-    status: "paid",
-    paymentMethod: "credit_card",
-    createdAt: new Date(2024, 9, 15, 16, 30),
-    paidAt: new Date(2024, 9, 15, 16, 35),
-    items: [
-      {
-        type: "hotel",
-        hotelName: "杭州西湖国宾馆",
-        address: "杭州市西湖区杨公堤18号",
-        city: "杭州",
-        checkInDate: new Date(2024, 10, 10),
-        checkOutDate: new Date(2024, 10, 13),
-        nights: 3,
-        roomType: "园景套房",
-        guests: [
-          {
-            name: "李娜",
-            idCard: "110101198505152345",
-            checkInStatus: "not_checked",
-          },
-        ],
-        originalPrice: 5400.00,
-        paidPrice: 5400.00,
-      },
-    ],
-  },
-];
+// 后端订单映射工具
+const combineDateAndTime = (date: Date, time: string) => {
+  const [hh = "0", mm = "0", ss = "0"] = time.split(":");
+  const d = new Date(date);
+  d.setHours(Number(hh));
+  d.setMinutes(Number(mm));
+  d.setSeconds(Number(ss));
+  d.setMilliseconds(0);
+  return d;
+};
+
+const mapBackendOrderToOrder = (o: BackendOrder): Order => {
+  const createdAt = new Date(o.created_at);
+  const paidAt = o.paid_at ? new Date(o.paid_at) : undefined;
+  const expiredAt = o.expired_at ? new Date(o.expired_at) : undefined;
+  const items: Order["items"] = o.items.map((it) => {
+    const depAirport = it.flight?.route?.departure_airport;
+    const arrAirport = it.flight?.route?.arrival_airport;
+    return {
+      type: "flight",
+      flightNumber: it.flight?.flight_number || String(it.flight_id),
+      airline: it.flight?.airline?.airline_name || "",
+      departureAirport: depAirport?.airport_code || "",
+      departureCity: depAirport?.city || "",
+      arrivalAirport: arrAirport?.airport_code || "",
+      arrivalCity: arrAirport?.city || "",
+      departureTime: combineDateAndTime(createdAt, it.flight?.scheduled_departure_time || "00:00:00"),
+      arrivalTime: combineDateAndTime(createdAt, it.flight?.scheduled_arrival_time || "00:00:00"),
+      cabinClass: it.cabin_class,
+      passengers: [
+        {
+          name: it.passenger?.name || "",
+          idCard: it.passenger?.id_card || "",
+          seatNumber: it.seat_number || undefined,
+          checkInStatus: it.check_in_status,
+        },
+      ],
+      originalPrice: it.original_price,
+      paidPrice: it.paid_price,
+    };
+  });
+  return {
+    orderId: o.order_id,
+    orderNo: o.order_no,
+    totalAmountOriginal: o.total_amount_original,
+    totalAmount: o.total_amount,
+    paymentStatus: o.payment_status,
+    status: o.status,
+    paymentMethod: o.payment_method,
+    createdAt,
+    paidAt,
+    expiredAt,
+    items,
+  };
+};
 
 const MyOrders = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"time" | "amount">("time");
@@ -322,9 +88,11 @@ const MyOrders = () => {
     setDialogOpen(true);
   };
 
+  const [orders, setOrders] = useState<Order[]>([]);
+
   const filterOrders = (status: string) => {
-    let filtered = mockOrders;
-    
+    let filtered = orders;
+
     // 按状态筛选
     if (status !== "all") {
       if (status === "unpaid") filtered = filtered.filter(o => o.paymentStatus === "unpaid");
@@ -332,12 +100,12 @@ const MyOrders = () => {
       else if (status === "completed") filtered = filtered.filter(o => o.status === "completed");
       else if (status === "cancelled") filtered = filtered.filter(o => o.status === "cancelled" || o.paymentStatus === "failed");
     }
-    
+
     // 按类型筛选
     if (typeFilter !== "all") {
       filtered = filtered.filter(o => o.items.some(item => item.type === typeFilter));
     }
-    
+
     // 排序
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === "time") {
@@ -350,18 +118,45 @@ const MyOrders = () => {
         return sortOrder === "desc" ? amountB - amountA : amountA - amountB;
       }
     });
-    
+
     return sorted;
   };
 
-  const stats = {
-    total: mockOrders.length,
-    unpaid: mockOrders.filter(o => o.paymentStatus === "unpaid").length,
-    paid: mockOrders.filter(o => o.paymentStatus === "paid").length,
-    completed: mockOrders.filter(o => o.status === "completed").length,
-    cancelled: mockOrders.filter(o => o.status === "cancelled" || o.paymentStatus === "failed").length,
-    totalAmount: mockOrders.filter(o => o.paymentStatus === "paid").reduce((sum, o) => sum + o.totalAmount, 0),
-  };
+  const [stats, setStats] = useState({ total: 0, unpaid: 0, paid: 0, completed: 0, cancelled: 0, totalAmount: 0 });
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token") || "";
+    if (!token) {
+      toast({ title: "登录已过期，请重新登录", variant: "destructive" });
+      navigate("/auth");
+      return;
+    }
+    (async () => {
+      try {
+        const s = await getOrderStats(token);
+        setStats({
+          total: s.total_orders,
+          unpaid: s.unpaid_count,
+          paid: s.paid_count,
+          completed: s.completed_count,
+          cancelled: s.cancelled_count,
+          totalAmount: s.total_spent,
+        });
+        const list = await getOrders(token, { limit: 50 });
+        setOrders(list.map(mapBackendOrderToOrder));
+      } catch (e: any) {
+        const msg = String(e?.message || "");
+        if (msg.includes("401") || msg.includes("403")) {
+          toast({ title: "登录已过期，请重新登录", description: msg, variant: "destructive" });
+          navigate("/auth");
+        } else if (msg.toLowerCase().includes("abort")) {
+          // HMR/路由切换导致的中断，忽略
+        } else {
+          toast({ title: "加载订单失败", description: msg, variant: "destructive" });
+        }
+      }
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -447,7 +242,7 @@ const MyOrders = () => {
                 <TabsTrigger value="completed">已完成</TabsTrigger>
                 <TabsTrigger value="cancelled">已取消</TabsTrigger>
               </TabsList>
-              
+
               <div className="flex items-center gap-2">
                 {/* 类型筛选 */}
                 <Select value={typeFilter} onValueChange={(value: any) => setTypeFilter(value)}>

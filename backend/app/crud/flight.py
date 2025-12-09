@@ -88,6 +88,8 @@ class CRUDFlight(CRUDBase[Flight, FlightCreate, FlightUpdate]):
         if request.cabin_class is not None:
             # request.cabin_class 是 Pydantic 的枚举，使用其值（小写字符串）
             query = query.filter(FlightPricing.cabin_class == request.cabin_class.value)
+        else:
+            query = query.filter(FlightPricing.cabin_class == CabinClass.ECONOMY.value)
 
         # 价格区间过滤（如果提供）
         if request.price_min is not None:

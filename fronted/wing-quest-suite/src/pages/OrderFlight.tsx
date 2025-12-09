@@ -172,7 +172,33 @@ const OrderFlight = () => {
             const order = await createOrder(payload, token);
             toast({ title: "订单提交成功", description: `订单号 ${order.order_no}` });
             const itemEmail = (order.items && order.items.length > 0) ? order.items[0].contact_email : undefined;
-            navigate("/payment", { state: { orderData: { orderId: order.order_id, orderNo: order.order_no, total: order.total_amount, contact: { name: order.contact_name, email: itemEmail }, flightInfo: flight.airline ? `${flight.departure.airport} → ${flight.arrival.airport}` : `${flight.segments[0].departure.airport} → ${flight.segments[flight.segments.length - 1].arrival.airport}` } } });
+
+            const passengerCountCalc = passengers.length;
+            const basePriceSum = passengers.reduce((sum, p) => sum + getCabinBasePrice(p.cabinClass), 0);
+            const airportFeeTotal = airportFee * passengerCountCalc;
+            const fuelSurchargeTotal = fuelSurcharge * passengerCountCalc;
+            const grandTotalCalc = basePriceSum + airportFeeTotal + fuelSurchargeTotal;
+            const allCabins = passengers.map(p => p.cabinClass);
+            const sameCabin = allCabins.every(c => c === allCabins[0]);
+            const cabinNameCalc = sameCabin ? (allCabins[0] === "economy" ? "经济舱" : allCabins[0] === "business" ? "商务舱" : "头等舱") : "多舱位";
+
+            navigate("/payment", {
+                state: {
+                    orderData: {
+                        orderId: order.order_id,
+                        orderNo: order.order_no,
+                        total: order.total_amount,
+                        contact: { name: order.contact_name, email: itemEmail },
+                        flightInfo: flight.airline ? `${flight.departure.airport} → ${flight.arrival.airport}` : `${flight.segments[0].departure.airport} → ${flight.segments[flight.segments.length - 1].arrival.airport}`,
+                        cabinName: cabinNameCalc,
+                        passengerCount: passengerCountCalc,
+                        basePrice: basePriceSum,
+                        airportFee: airportFeeTotal,
+                        fuelSurcharge: fuelSurchargeTotal,
+                        grandTotal: grandTotalCalc,
+                    }
+                }
+            });
         } catch (e: any) {
             toast({ title: e?.message || "提交失败", variant: "destructive" });
         }

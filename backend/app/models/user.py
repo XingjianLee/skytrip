@@ -19,8 +19,11 @@ class User(Base):
     vip_expire_date = Column(Date)
     role = Column(Enum('individual', 'agency', 'admin'), nullable=False, default='individual')
     agency_id = Column(BigInteger)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    id_issue_date = Column(Date)
+    id_expiry_date = Column(Date)
+    id_issuer = Column(String(100))
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
     # is_active 和 is_superuser 可以作为属性方法，而不是数据库字段
 
     orders = relationship("Order", back_populates="user")

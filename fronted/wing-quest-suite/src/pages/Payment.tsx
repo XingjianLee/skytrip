@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, CreditCard, Smartphone, Wallet, Lock, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -10,15 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { getOrder, payOrder } from "@/lib/api";
-
-type OrderItemRes = { cabin_class: "economy" | "business" | "first" };
-type OrderRes = {
-    order_id: number;
-    total_amount_original: number | string;
-    total_amount: number | string;
-    items: OrderItemRes[];
-};
+import { payOrder, getOrders, getOrderById } from "@/lib/api";
 
 interface PaymentMethod {
     id: string;
@@ -32,8 +24,7 @@ const Payment = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { toast } = useToast();
-    const orderData = location.state?.orderData;
-    const [order, setOrder] = useState<OrderRes | null>(null);
+    const [orderState, setOrderState] = useState<any>(location.state?.orderData);
 
     const [selectedMethod, setSelectedMethod] = useState("alipay");
     const [cardInfo, setCardInfo] = useState({
@@ -86,43 +77,87 @@ const Payment = () => {
     ];
 
     useEffect(() => {
-        (async () => {
-            try {
-                const token = localStorage.getItem("access_token") || "";
-                if (!token) return;
-                const oid = orderData?.orderId;
-                if (!oid) return;
-                const data = await getOrder(Number(oid), token);
-                setOrder(data as OrderRes);
-            } catch (e) {
-                // ignore for display fallback
-            }
-        })();
-    }, [orderData]);
-
-    const summary = useMemo(() => {
-        const passengerCount = order?.items?.length ?? (orderData?.passengerCount ?? 0);
-        const basePrice = order ? Number(order.total_amount_original ?? 0) : Number(orderData?.basePrice ?? 0);
-        const airportFee = order ? 0 : Number(orderData?.airportFee ?? 0);
-        const fuelSurcharge = order ? 0 : Number(orderData?.fuelSurcharge ?? 0);
-        const grandTotal = order ? Number(order.total_amount ?? 0) : Number(orderData?.grandTotal ?? 0);
-        const cabinName = (() => {
-            if (!order || !order.items) return orderData?.cabinName || "";
-            const set: Set<string> = new Set<string>(order.items.map((it) => String(it.cabin_class)));
-            const map: Record<"economy" | "business" | "first", string> = { economy: "经济舱", business: "商务舱", first: "头等舱" };
-            if (set.size === 1) {
-                const v = String([...set][0]);
-                if (v === "economy" || v === "business" || v === "first") {
-                    return map[v];
+        const token = localStorage.getItem("access_token") || "";
+        if (!token) {
+            toast({ title: "登录已过期，请重新登录", variant: "destructive" });
+            navigate("/auth");
+            return;
+        }
+        if (!orderState) {
+            (async () => {
+                try {
+                    const list = await getOrders(token, { status: "pending", payment_status: "unpaid", limit: 1 });
+                    if (list.length > 0) {
+                        const o = list[0];
+                        const first = o.items[0];
+                        const dep = first?.flight?.route?.departure_airport;
+                        const arr = first?.flight?.route?.arrival_airport;
+                        const flightInfo = dep && arr ? `${dep.city} ${dep.airport_code} → ${arr.city} ${arr.airport_code}` : "待确认";
+                        const basePrice = o.items.reduce((sum, it) => sum + Number(it.paid_price || 0), 0);
+                        const passengerCount = o.items.length;
+                        setOrderState({
+                            orderId: o.order_id,
+                            orderNo: o.order_no,
+                            flightInfo,
+                            cabinName: (first?.cabin_class === "economy" ? "经济舱" : first?.cabin_class === "business" ? "商务舱" : "头等舱"),
+                            passengerCount,
+                            basePrice,
+                            airportFee: 0,
+                            fuelSurcharge: 0,
+                            grandTotal: basePrice,
+                        });
+                    } else {
+                        toast({ title: "暂无可支付订单", variant: "destructive" });
+                        navigate("/my-orders");
+                    }
+                } catch (e: any) {
+                    const msg = String(e?.message || "");
+                    if (msg.includes("401") || msg.includes("403")) {
+                        toast({ title: "登录已过期，请重新登录", description: msg, variant: "destructive" });
+                        navigate("/auth");
+                    } else if (msg.toLowerCase().includes("abort")) {
+                        // 忽略中断
+                    } else {
+                        toast({ title: "加载订单失败", description: msg, variant: "destructive" });
+                        navigate("/my-orders");
+                    }
                 }
-                return v;
-            }
-            return "多舱位";
-        })();
-        return { passengerCount, basePrice, airportFee, fuelSurcharge, grandTotal, cabinName };
-    }, [order, orderData]);
+            })();
+        } else {
+            // 若仅带有 orderId 等基础信息，补齐摘要
+            (async () => {
+                try {
+                    if (!orderState.flightInfo || !orderState.cabinName || !orderState.passengerCount) {
+                        const o = await getOrderById(orderState.orderId, token);
+                        const first = o.items[0];
+                        const dep = first?.flight?.route?.departure_airport;
+                        const arr = first?.flight?.route?.arrival_airport;
+                        const flightInfo = dep && arr ? `${dep.city} ${dep.airport_code} → ${arr.city} ${arr.airport_code}` : orderState.flightInfo;
+                        const basePrice = o.items.reduce((sum, it) => sum + Number(it.paid_price || 0), 0);
+                        const passengerCount = o.items.length;
+                        setOrderState({
+                            ...orderState,
+                            flightInfo,
+                            cabinName: orderState.cabinName || (first?.cabin_class === "economy" ? "经济舱" : first?.cabin_class === "business" ? "商务舱" : "头等舱"),
+                            passengerCount,
+                            basePrice: orderState.basePrice ?? basePrice,
+                            airportFee: orderState.airportFee ?? 0,
+                            fuelSurcharge: orderState.fuelSurcharge ?? 0,
+                            grandTotal: orderState.grandTotal ?? (basePrice + 0 + 0),
+                        });
+                    }
+                } catch (e: any) {
+                    const msg = String(e?.message || "");
+                    if (msg.includes("401") || msg.includes("403")) {
+                        toast({ title: "登录已过期，请重新登录", description: msg, variant: "destructive" });
+                        navigate("/auth");
+                    }
+                }
+            })();
+        }
+    }, [orderState]);
 
-    const handlePayment = () => {
+    const handlePayment = async () => {
         if (selectedMethod === "card") {
             // 验证卡信息
             if (!cardInfo.number || !cardInfo.name || !cardInfo.expiry || !cardInfo.cvv) {
@@ -143,36 +178,17 @@ const Payment = () => {
             }
         }
 
-        (async () => {
-            try {
-                toast({ title: "正在处理支付", description: "请稍候..." });
-                const token = localStorage.getItem("access_token") || "";
-                const oid = order?.order_id ?? orderData?.orderId;
-                if (!oid || !token) throw new Error("订单或登录信息缺失");
-                await payOrder(Number(oid), token);
-                toast({ title: "支付成功！", description: "订单已确认，祝您旅途愉快" });
-                navigate("/my-orders");
-            } catch (e) {
-                const msg = e instanceof Error ? e.message : String(e);
-                toast({ title: msg || "支付失败", variant: "destructive" });
-            }
-        })();
+        toast({ title: "正在处理支付", description: "请稍候..." });
+        try {
+            const token = localStorage.getItem("access_token") || "";
+            if (!orderState?.orderId) throw new Error("缺少订单ID");
+            await payOrder(orderState.orderId, token);
+            toast({ title: "支付成功！", description: "订单已确认，祝您旅途愉快" });
+            navigate("/my-orders");
+        } catch (e: any) {
+            toast({ title: "支付失败", description: e?.message || "", variant: "destructive" });
+        }
     };
-
-    if (!orderData) {
-        return (
-            <div className="min-h-screen flex flex-col bg-background">
-                <Navbar isLoggedIn={true} />
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center">
-                        <p className="text-muted-foreground mb-4">订单信息丢失</p>
-                        <Button onClick={() => navigate("/book-flight")}>返回首页</Button>
-                    </div>
-                </div>
-                <Footer />
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen flex flex-col bg-background">
@@ -206,8 +222,8 @@ const Payment = () => {
                                             <div
                                                 key={method.id}
                                                 className={`flex items-center space-x-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedMethod === method.id
-                                                        ? "border-primary bg-primary/5"
-                                                        : "border-border hover:border-primary/50"
+                                                    ? "border-primary bg-primary/5"
+                                                    : "border-border hover:border-primary/50"
                                                     }`}
                                                 onClick={() => setSelectedMethod(method.id)}
                                             >
@@ -335,19 +351,19 @@ const Payment = () => {
                                 <div className="space-y-3 mb-4">
                                     <div>
                                         <div className="text-sm text-muted-foreground mb-1">航班</div>
-                                        <div className="font-medium">{orderData.flightInfo}</div>
+                                        <div className="font-medium">{orderState?.flightInfo}</div>
                                     </div>
 
                                     <Separator />
 
                                     <div>
                                         <div className="text-sm text-muted-foreground mb-1">舱位类型</div>
-                                        <div className="font-medium">{summary.cabinName}</div>
+                                        <div className="font-medium">{orderState?.cabinName}</div>
                                     </div>
 
                                     <div>
                                         <div className="text-sm text-muted-foreground mb-1">乘机人数</div>
-                                        <div className="font-medium">{summary.passengerCount} 人</div>
+                                        <div className="font-medium">{orderState?.passengerCount} 人</div>
                                     </div>
 
                                     <Separator />
@@ -355,15 +371,15 @@ const Payment = () => {
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">基础票价</span>
-                                            <span>¥{summary.basePrice}</span>
+                                            <span>¥{orderState?.basePrice}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">机场建设费</span>
-                                            <span>¥{summary.airportFee}</span>
+                                            <span>¥{orderState?.airportFee}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span className="text-muted-foreground">燃油附加费</span>
-                                            <span>¥{summary.fuelSurcharge}</span>
+                                            <span>¥{orderState?.fuelSurcharge}</span>
                                         </div>
                                     </div>
 
@@ -373,20 +389,39 @@ const Payment = () => {
                                         <span className="text-lg font-semibold">应付总额</span>
                                         <div className="text-right">
                                             <div className="text-3xl font-bold text-primary">
-                                                ¥{summary.grandTotal}
+                                                ¥{orderState?.grandTotal}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <Button
-                                    className="w-full"
-                                    size="lg"
-                                    onClick={handlePayment}
-                                >
-                                    <Lock className="w-4 h-4 mr-2" />
-                                    确认支付
-                                </Button>
+                                <div className="flex flex-col gap-3">
+                                    <Button
+                                        className="w-full"
+                                        size="lg"
+                                        onClick={handlePayment}
+                                    >
+                                        <Lock className="w-4 h-4 mr-2" />
+                                        确认支付
+                                    </Button>
+                                    <div className="flex gap-3">
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => {
+                                                toast({ title: "已保存为待支付订单" });
+                                                navigate("/my-orders");
+                                            }}
+                                        >稍后支付</Button>
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            onClick={() => {
+                                                navigate("/cancel-order", { state: { orderId: orderState?.orderId } });
+                                            }}
+                                        >取消订单</Button>
+                                    </div>
+                                </div>
 
                                 <div className="mt-4 space-y-2">
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">

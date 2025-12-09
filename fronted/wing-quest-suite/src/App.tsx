@@ -22,6 +22,7 @@ import RefundChange from "./pages/RefundChange";
 import CustomerService from "./pages/CustomerService";
 import OrderFlight from "./pages/OrderFlight";
 import Payment from "./pages/Payment";
+import CancelOrder from "./pages/CancelOrder";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
           <Route path="/customer-service" element={<CustomerService />} />
           <Route path="/order-flight" element={<OrderFlight />} />
           <Route path="/payment" element={<Payment />} />
+          <Route path="/cancel-order" element={<CancelOrder />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

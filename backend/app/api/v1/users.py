@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -47,21 +47,19 @@ def read_user_me(
 def update_user_me(
     *,
     db: Session = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_active_user),
     user_in: schemas.UserUpdate,
-    current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
-    """
-    Update current user profile. All fields are optional.
-    """
-    # uniqueness checks
-    if user_in.email and user_in.email != current_user.email:
-        existing = crud.user.get_by_email(db, email=user_in.email)
+    allowed_fields = {"real_name", "phone", "email", "avatar_url", "bio"}
+    update_data: Dict[str, Any] = {k: v for k, v in user_in.dict(exclude_unset=True).items() if k in allowed_fields}
+    if "email" in update_data and update_data["email"]:
+        existing = crud.user.get_by_email(db, email=update_data["email"])
         if existing and existing.id != current_user.id:
-            raise HTTPException(status_code=400, detail="邮箱已被使用")
-    if user_in.phone and user_in.phone != current_user.phone:
-        existing = crud.user.get_by_phone(db, phone=user_in.phone)
-        if existing and existing.id != current_user.id:
-            raise HTTPException(status_code=400, detail="手机号已被使用")
-
-    updated = crud.user.update_profile(db, db_obj=current_user, obj_in=user_in)
-    return updated
+            raise HTTPException(status_code=409, detail="邮箱已被使用")
+    if "phone" in update_data and update_data["phone"]:
+        from sqlalchemy import or_
+        q = db.query(models.User).filter(models.User.phone == update_data["phone"]).first()
+        if q and q.id != current_user.id:
+            raise HTTPException(status_code=409, detail="手机号已被使用")
+    obj = crud.user.update(db, db_obj=current_user, obj_in=update_data)
+    return obj

@@ -31,6 +31,9 @@ type BackendUser = {
   vip_expire_date?: string | null;
   role: string;
   created_at: string;
+  id_issue_date?: string | null;
+  id_expiry_date?: string | null;
+  id_issuer?: string | null;
 };
 
 function splitChineseName(fullName: string) {
@@ -79,6 +82,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [nickname, setNickname] = useState("张伟");
+  const [snapshot, setSnapshot] = useState<BackendUser | null>(null);
   const [isEditingNickname, setIsEditingNickname] = useState(false);
   const [tempNickname, setTempNickname] = useState(nickname);
   const [isEditingBasic, setIsEditingBasic] = useState(false);
@@ -95,6 +99,11 @@ const Profile = () => {
   const [bioValue, setBioValue] = useState<string>("");
   const [showVerify, setShowVerify] = useState<boolean>(false);
   const [verifyCode, setVerifyCode] = useState<string>("");
+  const [idNumberValue, setIdNumberValue] = useState<string>("");
+  const [idNameValue, setIdNameValue] = useState<string>("");
+  const [idIssueDateValue, setIdIssueDateValue] = useState<string>("");
+  const [idExpiryDateValue, setIdExpiryDateValue] = useState<string>("");
+  const [idIssuerValue, setIdIssuerValue] = useState<string>("");
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -105,13 +114,12 @@ const Profile = () => {
           return;
         }
         const me: BackendUser = await getMe(token);
+        setSnapshot(me);
         const displayName = me.real_name || me.username;
         setNickname(displayName);
         setTempNickname(displayName);
         setAvatarUrl(me.avatar_url || undefined);
         setVerified(Boolean(me.id_card));
-        // 会员编号：若无后端字段，基于用户ID与创建日期生成
-        // 会员编号逻辑：vip_level != 0 显示统一编号，否则显示“暂未开通”
         setMemberNo((me.vip_level ?? 0) !== 0 ? "VIP00000001" : "暂未开通");
         setJoinDate(formatJoinDate(me.created_at));
         setPhoneValue(me.phone || "");
@@ -121,7 +129,12 @@ const Profile = () => {
         setFirstName(firstName || "");
         setVipLevel(me.vip_level ?? 0);
         const b = parseBirthdayFromIdCard(me.id_card);
-        if (b) setBirthdayValue(b);
+        setBirthdayValue(b || "");
+        setIdNumberValue(me.id_card || "");
+        setIdNameValue(me.real_name || "");
+        setIdIssueDateValue(me.id_issue_date || "");
+        setIdExpiryDateValue(me.id_expiry_date || "");
+        setIdIssuerValue(me.id_issuer || "");
       } catch (e) {
         console.error(e);
       }
@@ -137,7 +150,7 @@ const Profile = () => {
   };
 
   const handleSave = async () => {
-    setShowVerify(true);
+    await confirmVerifyAndSave();
   };
 
   const confirmVerifyAndSave = async () => {
@@ -307,7 +320,7 @@ const Profile = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setShowVerify(true)}
+                          onClick={() => confirmVerifyAndSave()}
                           className="gap-2"
                         >
                           <Check className="w-4 h-4" />
@@ -317,6 +330,16 @@ const Profile = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
+                            if (snapshot) {
+                              const displayName = snapshot.real_name || snapshot.username;
+                              const { lastName, firstName } = splitChineseName(displayName);
+                              setLastName(lastName || "");
+                              setFirstName(firstName || "");
+                              setPhoneValue(snapshot.phone || "");
+                              setEmailValue(snapshot.email || "");
+                              const b = parseBirthdayFromIdCard(snapshot.id_card);
+                              if (b) setBirthdayValue(b);
+                            }
                             setIsEditingBasic(false);
                             toast.info("已取消编辑");
                           }}
@@ -447,31 +470,32 @@ const Profile = () => {
                       <Label htmlFor="idNumber">身份证号码 *</Label>
                       <Input
                         id="idNumber"
-                        defaultValue="110101199001011234"
+                        value={idNumberValue}
+                        onChange={(e) => setIdNumberValue(e.target.value)}
                         placeholder="请输入18位身份证号"
                         maxLength={18}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="idName">证件姓名 *</Label>
-                      <Input id="idName" defaultValue="张伟" placeholder="请输入证件上的姓名" />
+                      <Input id="idName" value={idNameValue} onChange={(e) => setIdNameValue(e.target.value)} placeholder="请输入证件上的姓名" />
                     </div>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="idIssueDate">签发日期</Label>
-                      <Input id="idIssueDate" type="date" defaultValue="2020-01-01" />
+                      <Input id="idIssueDate" type="date" value={idIssueDateValue} onChange={(e) => setIdIssueDateValue(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="idExpiryDate">有效期至</Label>
-                      <Input id="idExpiryDate" type="date" defaultValue="2030-01-01" />
+                      <Input id="idExpiryDate" type="date" value={idExpiryDateValue} onChange={(e) => setIdExpiryDateValue(e.target.value)} />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="idIssuer">签发机关</Label>
-                    <Input id="idIssuer" defaultValue="北京市公安局朝阳分局" placeholder="请输入签发机关" />
+                    <Input id="idIssuer" value={idIssuerValue} onChange={(e) => setIdIssuerValue(e.target.value)} placeholder="请输入签发机关" />
                   </div>
 
                   <Separator />

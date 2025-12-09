@@ -1,10 +1,12 @@
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from .airport import Airport
 
 
 class RouteBase(BaseModel):
-    origin_airport_id: int
-    destination_airport_id: int
+    departure_airport_code: str
+    arrival_airport_code: str
+    distance_km: int | None = None
 
 
 class RouteCreate(RouteBase):
@@ -16,18 +18,14 @@ class RouteUpdate(RouteBase):
 
 
 class Route(RouteBase):
-    id: int
-
-    class Config:
-        orm_mode = True
+    route_id: int
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RouteWithAirports(Route):
-    origin_airport: "Airport"
-    destination_airport: "Airport"
+    departure_airport: "Airport"
+    arrival_airport: "Airport"
 
 
 class RouteWithFlights(Route):
     flights: list = []
-
-RouteWithAirports.model_rebuild()
