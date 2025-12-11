@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { Calendar, MapPin, Users, Search, ArrowLeftRight } from "lucide-react";
 
-export default function FlightSearchBar() {
+export interface SearchData {
+  from: string;
+  to: string;
+  departDate: string;
+  passengers: number;
+  cabinClass?: string;
+}
+
+export default function FlightSearchBar({ onSearch }: { onSearch?: (data: SearchData) => void }) {
   const [searchData, setSearchData] = useState({
     from: "北京",
     to: "上海",
@@ -89,7 +97,16 @@ export default function FlightSearchBar() {
 
           {/* Search Button */}
           <div className="md:col-span-1">
-            <button className="w-full h-[46px] bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all rounded-md flex items-center justify-center text-white">
+            <button
+              className="w-full h-[46px] bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all rounded-md flex items-center justify-center text-white"
+              onClick={() => onSearch?.({
+                from: searchData.from,
+                to: searchData.to,
+                departDate: searchData.departDate,
+                passengers: searchData.passengers,
+                cabinClass: searchData.cabinClass,
+              })}
+            >
               <Search className="h-5 w-5" />
             </button>
           </div>

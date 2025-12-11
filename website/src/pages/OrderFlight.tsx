@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Plane, Clock, MapPin, User, Phone, Mail, CreditCard, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -12,12 +12,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { createOrder, getFlightPricing } from "@/lib/api";
+
+type CabinType = "economy" | "business" | "first";
 
 interface CabinClass {
-    type: string;
+    type: CabinType;
     name: string;
     basePrice: number;
     features: string[];
+}
+
+interface PassengerForm {
+    name: string;
+    idType: string;
+    idNumber: string;
+    contactPhone: string;
+    cabinClass: CabinType;
 }
 
 const OrderFlight = () => {
@@ -25,11 +36,12 @@ const OrderFlight = () => {
     const location = useLocation();
     const { toast } = useToast();
     const flight = location.state?.flight;
+    const flightId = flight?.flight_id || flight?.flightId || flight?.id;
 
-    const [selectedCabin, setSelectedCabin] = useState("economy");
+    // 取消统一舱位选择，改为每位乘机人单独选择舱位
     const [passengerCount, setPassengerCount] = useState(1);
-    const [passengers, setPassengers] = useState([
-        { name: "", idType: "idCard", idNumber: "", birthDate: "" }
+    const [passengers, setPassengers] = useState<PassengerForm[]>([
+        { name: "", idType: "idCard", idNumber: "", contactPhone: "", cabinClass: "economy" }
     ]);
     const [contact, setContact] = useState({
         name: "",
@@ -37,39 +49,56 @@ const OrderFlight = () => {
         email: ""
     });
 
-    // 舱位价格配置
-    const cabinClasses: CabinClass[] = [
+    // 舱位价格（从后端获取并填充）
+    const [cabinClasses, setCabinClasses] = useState<CabinClass[]>([
         {
             type: "economy",
             name: "经济舱",
-            basePrice: flight?.price || 1280,
+            basePrice: 0,
             features: ["标准座椅", "免费托运20kg", "飞机餐"]
         },
         {
             type: "business",
             name: "商务舱",
-            basePrice: (flight?.price || 1280) * 3,
+            basePrice: 0,
             features: ["宽敞座椅", "免费托运40kg", "高级餐饮", "优先登机", "贵宾休息室"]
         },
         {
             type: "first",
             name: "头等舱",
-            basePrice: (flight?.price || 1280) * 5,
+            basePrice: 0,
             features: ["豪华座椅", "免费托运60kg", "定制餐饮", "优先服务", "专属休息室", "专车接送"]
         }
-    ];
+    ]);
+
+    useEffect(() => {
+        if (!flightId) return;
+        (async () => {
+            try {
+                const pricing = await getFlightPricing(flightId);
+                const priceMap = new Map(pricing.map(p => [p.cabin_class, p.base_price]));
+                setCabinClasses(prev => prev.map(c => ({
+                    ...c,
+                    basePrice: priceMap.get(c.type) ?? c.basePrice,
+                })));
+            } catch (e: any) {
+                toast({ title: e?.message || "获取价格失败", variant: "destructive" });
+            }
+        })();
+    }, [flightId]);
 
     // 费用计算
-    const selectedCabinData = cabinClasses.find(c => c.type === selectedCabin);
-    const basePrice = selectedCabinData?.basePrice || 0;
     const airportFee = 50; // 机场建设费
     const fuelSurcharge = 80; // 燃油附加费
-    const totalPerPerson = basePrice + airportFee + fuelSurcharge;
-    const grandTotal = totalPerPerson * passengerCount;
+    const getCabinBasePrice = (type: CabinType) => cabinClasses.find(c => c.type === type)?.basePrice || 0;
+    const grandTotal = passengers.reduce((sum, p) => {
+        const base = getCabinBasePrice(p.cabinClass);
+        return sum + (base + airportFee + fuelSurcharge);
+    }, 0);
 
     const handleAddPassenger = () => {
         if (passengers.length < 9) {
-            setPassengers([...passengers, { name: "", idType: "idCard", idNumber: "", birthDate: "" }]);
+            setPassengers([...passengers, { name: "", idType: "idCard", idNumber: "", contactPhone: "", cabinClass: "economy" }]);
             setPassengerCount(passengers.length + 1);
         }
     };
@@ -88,7 +117,13 @@ const OrderFlight = () => {
         setPassengers(newPassengers);
     };
 
-    const handleSubmit = () => {
+    const handleCabinChange = (index: number, value: CabinType) => {
+        const newPassengers = [...passengers];
+        newPassengers[index] = { ...newPassengers[index], cabinClass: value };
+        setPassengers(newPassengers);
+    };
+
+    const handleSubmit = async () => {
         // 验证表单
         if (!contact.name || !contact.phone || !contact.email) {
             toast({
@@ -99,41 +134,74 @@ const OrderFlight = () => {
         }
 
         for (let i = 0; i < passengers.length; i++) {
-            if (!passengers[i].name || !passengers[i].idNumber || !passengers[i].birthDate) {
+            if (!passengers[i].name || !passengers[i].idNumber || !passengers[i].contactPhone || !passengers[i].cabinClass) {
                 toast({
-                    title: `请填写完整第${i + 1}位乘机人信息`,
+                    title: `请填写完整第${i + 1}位乘机人信息（姓名/证件号/联系电话/舱位）`,
                     variant: "destructive"
                 });
                 return;
             }
         }
+        try {
+            const token = localStorage.getItem("access_token") || "";
+            if (!token) {
+                toast({ title: "请先登录后再提交订单", variant: "destructive" });
+                navigate("/auth");
+                return;
+            }
+            const fid = flight?.id || flight?.flightId || flight?.flight_id;
+            if (!fid) {
+                toast({ title: "未找到航班ID，无法提交订单", variant: "destructive" });
+                return;
+            }
 
-        toast({
-            title: "订单提交成功",
-            description: "正在跳转到支付页面..."
-        });
+            const payload = {
+                payment_method: "alipay" as const,
+                contact_name: contact.name,
+                contact_email: contact.email,
+                items: passengers.map((p) => ({
+                    flight_id: fid,
+                    cabin_class: (p as any).cabinClass,
+                    passenger_info: {
+                        name: p.name,
+                        id_card: p.idNumber,
+                        contact_phone: (p as any).contactPhone,
+                    },
+                })),
+            };
+            const order = await createOrder(payload, token);
+            toast({ title: "订单提交成功", description: `订单号 ${order.order_no}` });
+            const itemEmail = (order.items && order.items.length > 0) ? order.items[0].contact_email : undefined;
 
-        // 准备订单数据
-        const orderData = {
-            flightInfo: flight.airline
-                ? `${flight.departure.airport} → ${flight.arrival.airport}`
-                : `${flight.segments[0].departure.airport} → ${flight.segments[flight.segments.length - 1].arrival.airport}`,
-            cabinName: selectedCabinData?.name,
-            passengerCount,
-            basePrice,
-            airportFee,
-            fuelSurcharge,
-            totalPerPerson,
-            grandTotal,
-            passengers,
-            contact,
-            flight
-        };
+            const passengerCountCalc = passengers.length;
+            const basePriceSum = passengers.reduce((sum, p) => sum + getCabinBasePrice(p.cabinClass), 0);
+            const airportFeeTotal = airportFee * passengerCountCalc;
+            const fuelSurchargeTotal = fuelSurcharge * passengerCountCalc;
+            const grandTotalCalc = basePriceSum + airportFeeTotal + fuelSurchargeTotal;
+            const allCabins = passengers.map(p => p.cabinClass);
+            const sameCabin = allCabins.every(c => c === allCabins[0]);
+            const cabinNameCalc = sameCabin ? (allCabins[0] === "economy" ? "经济舱" : allCabins[0] === "business" ? "商务舱" : "头等舱") : "多舱位";
 
-        // 跳转到支付页面
-        setTimeout(() => {
-            navigate("/payment", { state: { orderData } });
-        }, 1000);
+            navigate("/payment", {
+                state: {
+                    orderData: {
+                        orderId: order.order_id,
+                        orderNo: order.order_no,
+                        total: order.total_amount,
+                        contact: { name: order.contact_name, email: itemEmail },
+                        flightInfo: flight.airline ? `${flight.departure.airport} → ${flight.arrival.airport}` : `${flight.segments[0].departure.airport} → ${flight.segments[flight.segments.length - 1].arrival.airport}`,
+                        cabinName: cabinNameCalc,
+                        passengerCount: passengerCountCalc,
+                        basePrice: basePriceSum,
+                        airportFee: airportFeeTotal,
+                        fuelSurcharge: fuelSurchargeTotal,
+                        grandTotal: grandTotalCalc,
+                    }
+                }
+            });
+        } catch (e: any) {
+            toast({ title: e?.message || "提交失败", variant: "destructive" });
+        }
     };
 
     if (!flight) {
@@ -211,45 +279,37 @@ const OrderFlight = () => {
                                 </div>
                             </Card>
 
-                            {/* Cabin Class Selection */}
+                            {/* Cabin Information (display only) */}
                             <Card className="p-6">
-                                <h2 className="text-xl font-semibold mb-4">选择舱位</h2>
-                                <RadioGroup value={selectedCabin} onValueChange={setSelectedCabin}>
-                                    <div className="space-y-3">
-                                        {cabinClasses.map((cabin) => (
-                                            <div
-                                                key={cabin.type}
-                                                className={`flex items-start space-x-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                                                    selectedCabin === cabin.type
-                                                        ? "border-primary bg-primary/5"
-                                                        : "border-border hover:border-primary/50"
-                                                }`}
-                                                onClick={() => setSelectedCabin(cabin.type)}
-                                            >
-                                                <RadioGroupItem value={cabin.type} id={cabin.type} className="mt-1" />
-                                                <div className="flex-1">
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <Label htmlFor={cabin.type} className="text-lg font-semibold cursor-pointer">
-                                                            {cabin.name}
-                                                        </Label>
-                                                        <div className="text-right">
-                                                            <div className="text-2xl font-bold text-primary">¥{cabin.basePrice}</div>
-                                                            <div className="text-xs text-muted-foreground">基础票价</div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {cabin.features.map((feature, idx) => (
-                                                            <Badge key={idx} variant="secondary" className="text-xs">
-                                                                <Check className="w-3 h-3 mr-1" />
-                                                                {feature}
-                                                            </Badge>
-                                                        ))}
+                                <h2 className="text-xl font-semibold mb-4">舱位信息</h2>
+                                <div className="space-y-3">
+                                    {cabinClasses.map((cabin) => (
+                                        <div
+                                            key={cabin.type}
+                                            className="flex items-start space-x-3 p-4 rounded-lg border-2 border-border hover:border-primary/40 transition-all"
+                                        >
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <Label className="text-lg font-semibold">
+                                                        {cabin.name}
+                                                    </Label>
+                                                    <div className="text-right">
+                                                        <div className="text-2xl font-bold text-primary">¥{cabin.basePrice}</div>
+                                                        <div className="text-xs text-muted-foreground">基础票价</div>
                                                     </div>
                                                 </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {cabin.features.map((feature, idx) => (
+                                                        <Badge key={idx} variant="secondary" className="text-xs">
+                                                            <Check className="w-3 h-3 mr-1" />
+                                                            {feature}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                </RadioGroup>
+                                        </div>
+                                    ))}
+                                </div>
                             </Card>
 
                             {/* Passenger Information */}
@@ -302,7 +362,7 @@ const OrderFlight = () => {
                                                         value={passenger.idType}
                                                         onValueChange={(value) => handlePassengerChange(index, "idType", value)}
                                                     >
-                                                        <SelectTrigger id={`idType-${index}`}>
+                                                        <SelectTrigger id={`idType-${index}`} className="w-full h-10">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
@@ -324,13 +384,30 @@ const OrderFlight = () => {
                                                 </div>
 
                                                 <div>
-                                                    <Label htmlFor={`birthDate-${index}`}>出生日期 *</Label>
+                                                    <Label htmlFor={`contactPhone-${index}`}>联系电话 *</Label>
                                                     <Input
-                                                        id={`birthDate-${index}`}
-                                                        type="date"
-                                                        value={passenger.birthDate}
-                                                        onChange={(e) => handlePassengerChange(index, "birthDate", e.target.value)}
+                                                        id={`contactPhone-${index}`}
+                                                        type="tel"
+                                                        placeholder="请输入手机号码"
+                                                        value={(passenger as any).contactPhone || ""}
+                                                        onChange={(e) => handlePassengerChange(index, "contactPhone", e.target.value)}
                                                     />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <Label htmlFor={`cabin-${index}`}>舱位选择 *</Label>
+                                                    <Select
+                                                        value={passenger.cabinClass}
+                                                        onValueChange={(value) => handleCabinChange(index, value as CabinType)}
+                                                    >
+                                                        <SelectTrigger id={`cabin-${index}`} className="w-full h-10">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="economy">经济舱 · ¥{getCabinBasePrice("economy")}</SelectItem>
+                                                            <SelectItem value="business">商务舱 · ¥{getCabinBasePrice("business")}</SelectItem>
+                                                            <SelectItem value="first">头等舱 · ¥{getCabinBasePrice("first")}</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
                                                 </div>
                                             </div>
                                         </div>
@@ -393,18 +470,21 @@ const OrderFlight = () => {
 
                                 <div className="space-y-3 mb-4">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">舱位类型</span>
-                                        <span className="font-medium">{selectedCabinData?.name}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">乘机人数</span>
                                         <span className="font-medium">{passengerCount} 人</span>
                                     </div>
                                     <Separator />
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">基础票价</span>
-                                        <span>¥{basePrice}</span>
-                                    </div>
+                                    {/* 展示各舱位人数与单价 */}
+                                    {(["economy", "business", "first"] as const).map(type => {
+                                        const count = passengers.filter(p => p.cabinClass === type).length;
+                                        const price = getCabinBasePrice(type);
+                                        return (
+                                            <div className="flex justify-between text-sm" key={type}>
+                                                <span className="text-muted-foreground">{type === "economy" ? "经济舱" : type === "business" ? "商务舱" : "头等舱"} × {count}</span>
+                                                <span>¥{price}</span>
+                                            </div>
+                                        );
+                                    })}
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">机场建设费</span>
                                         <span>¥{airportFee}</span>
@@ -412,11 +492,6 @@ const OrderFlight = () => {
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">燃油附加费</span>
                                         <span>¥{fuelSurcharge}</span>
-                                    </div>
-                                    <Separator />
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">单人总价</span>
-                                        <span className="font-semibold">¥{totalPerPerson}</span>
                                     </div>
                                 </div>
 

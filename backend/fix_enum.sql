@@ -1,0 +1,1 @@
+ALTER TABLE flights MODIFY COLUMN status ENUM('active', 'suspended') DEFAULT 'active';

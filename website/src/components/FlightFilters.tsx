@@ -46,7 +46,7 @@ export default function FlightFilters({ filters, onFilterChange }: FilterProps) 
       cabinClass: "all",
       facilities: [],
       sortBy: "price",
-      priceRange: [0, 5000]
+      priceRange: [0, 10000]
     });
   };
 
@@ -213,7 +213,7 @@ export default function FlightFilters({ filters, onFilterChange }: FilterProps) 
                   onFilterChange({ ...filters, priceRange: value })
                 }
                 min={0}
-                max={5000}
+                max={10000}
                 step={100}
                 className="mb-3"
               />

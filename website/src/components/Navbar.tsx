@@ -14,9 +14,9 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <div 
+          <div
             className="flex items-center gap-2 cursor-pointer"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/home")}
           >
             <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
               <Plane className="w-6 h-6 text-primary" />
@@ -29,10 +29,10 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
             {isLoggedIn ? (
               <>
                 <button
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/home")}
                   className="text-primary font-medium hover:text-accent transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-accent after:transition-all hover:after:w-full"
                 >
-                  首页
+                  导航栏
                 </button>
                 <button
                   onClick={() => navigate("/book-flight")}
@@ -68,12 +68,6 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
             ) : (
               <>
                 <button
-                  onClick={() => navigate("/")}
-                  className="text-primary font-medium hover:text-accent transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-accent after:transition-all hover:after:w-full"
-                >
-                  首页
-                </button>
-                <button
                   onClick={() => navigate("/#about")}
                   className="text-foreground hover:text-accent transition-colors relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-accent after:transition-all hover:after:w-full"
                 >
@@ -98,8 +92,8 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
           {/* Action Buttons */}
           <div className="flex items-center gap-4">
             {isLoggedIn ? (
-              <Button 
-                variant="accent" 
+              <Button
+                variant="accent"
                 className="gap-2"
                 onClick={() => navigate("/profile")}
               >
@@ -108,14 +102,14 @@ const Navbar = ({ isLoggedIn = false }: NavbarProps) => {
               </Button>
             ) : (
               <>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="hidden md:inline-flex"
                   onClick={() => navigate("/auth")}
                 >
                   登录
                 </Button>
-                <Button 
+                <Button
                   variant="accent"
                   onClick={() => navigate("/auth")}
                 >

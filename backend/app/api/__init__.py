@@ -1,1 +1,1 @@
-# 空文件，用于将目录标记为Python包
+"""API package for SkyTrip backend."""
