@@ -36,6 +36,7 @@ const mapBackendOrderToOrder = (o: BackendOrder): Order => {
   const items: Order["items"] = o.items.map((it) => {
     const depAirport = it.flight?.route?.departure_airport;
     const arrAirport = it.flight?.route?.arrival_airport;
+    const baseDate = it.flight_date ? new Date(it.flight_date) : createdAt;
     return {
       type: "flight",
       flightNumber: it.flight?.flight_number || String(it.flight_id),
@@ -44,8 +45,8 @@ const mapBackendOrderToOrder = (o: BackendOrder): Order => {
       departureCity: depAirport?.city || "",
       arrivalAirport: arrAirport?.airport_code || "",
       arrivalCity: arrAirport?.city || "",
-      departureTime: combineDateAndTime(createdAt, it.flight?.scheduled_departure_time || "00:00:00"),
-      arrivalTime: combineDateAndTime(createdAt, it.flight?.scheduled_arrival_time || "00:00:00"),
+      departureTime: combineDateAndTime(baseDate, it.flight?.scheduled_departure_time || "00:00:00"),
+      arrivalTime: combineDateAndTime(baseDate, it.flight?.scheduled_arrival_time || "00:00:00"),
       cabinClass: it.cabin_class,
       passengers: [
         {

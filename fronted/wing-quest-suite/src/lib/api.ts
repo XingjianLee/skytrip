@@ -207,6 +207,26 @@ export async function cancelOrder(order_id: number, flight_date: string, token: 
   return res.json();
 }
 
+export async function updateOrderItemDate(item_id: number, flight_date: string, token: string) {
+  const url = `http://localhost:8000/api/v1/orders/items/${item_id}/date?flight_date=${encodeURIComponent(flight_date)}`;
+  const res = await fetch(url, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function updateOrderItemChange(item_id: number, flight_id: number, cabin_class: "economy" | "business" | "first", flight_date: string, token: string) {
+  const url = `http://localhost:8000/api/v1/orders/items/${item_id}/change?flight_id=${flight_id}&cabin_class=${encodeURIComponent(cabin_class)}&flight_date=${encodeURIComponent(flight_date)}`;
+  const res = await fetch(url, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function updateCheckIn(item_id: number, seat_number: string, token: string) {
   const url = `http://localhost:8000/api/v1/orders/items/${item_id}/check-in?check_in_status=checked&seat_number=${encodeURIComponent(seat_number)}`;
   const res = await fetch(url, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
@@ -226,6 +246,7 @@ export interface BackendOrderItem {
   passenger_id: number;
   original_price: number;
   paid_price: number;
+  flight_date?: string;
   seat_number?: string | null;
   contact_email?: string | null;
   check_in_status: "not_checked" | "checked";
@@ -283,4 +304,85 @@ export async function getOrderById(order_id: number, token: string) {
     throw new Error(errText || `HTTP ${res.status}`);
   }
   return res.json() as Promise<BackendOrder>;
+}
+
+export interface AISuggestion {
+  label: string;
+  route?: string;
+  params?: Record<string, unknown>;
+}
+
+export interface AIOrderSummary {
+  order_id: number;
+  order_no: string;
+  status: string;
+  payment_status: string;
+  total: number;
+}
+
+export interface AIChatResponse {
+  reply: string;
+  suggestions?: AISuggestion[];
+  orders?: AIOrderSummary[];
+}
+
+export async function postAIChat(payload: { message: string }, token: string): Promise<AIChatResponse> {
+  const res = await fetch("http://localhost:8000/api/v1/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `HTTP ${res.status}`);
+  }
+  return res.json() as Promise<AIChatResponse>;
+}
+
+export async function streamAIChat(
+  payload: { message: string },
+  token: string,
+  handlers: { onDelta: (text: string) => void; onFinal: (data: { suggestions?: AISuggestion[]; orders?: AIOrderSummary[] }) => void; onEvent?: (evt: { type: string; data: any }) => void },
+  signal?: AbortSignal
+) {
+  const res = await fetch("http://localhost:8000/api/v1/ai/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, Accept: "text/event-stream" },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(errText || `HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() || "";
+    for (const part of parts) {
+      const lines = part.split("\n");
+      let eventType: string | null = null;
+      for (const line of lines) {
+        if (line.startsWith("event:")) eventType = line.slice(6).trim();
+        if (line.startsWith("data:")) {
+          const dataStr = line.slice(5).trim();
+          try {
+            const data = JSON.parse(dataStr);
+            if (eventType === "final") {
+              handlers.onFinal({ suggestions: data.suggestions || [], orders: data.orders || [] });
+            } else if (eventType && handlers.onEvent) {
+              handlers.onEvent({ type: eventType, data });
+            } else if (typeof data.delta === "string") {
+              handlers.onDelta(data.delta);
+            }
+          } catch { void 0 }
+        }
+      }
+    }
+  }
 }

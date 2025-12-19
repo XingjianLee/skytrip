@@ -35,6 +35,9 @@ from .check_in import (
     CheckIn, CheckInCreate, CheckInUpdate, CheckInWithDetails,
     CheckInResponse, SeatSelection, BoardingPass
 )
+from .ai import (
+    AIChatRequest, AIChatResponse, AISuggestion, AIOrderSummary
+)
 
 __all__ = [
     # User schemas
@@ -72,4 +75,7 @@ __all__ = [
     # Check-in schemas
     "CheckIn", "CheckInCreate", "CheckInUpdate", "CheckInWithDetails",
     "CheckInResponse", "SeatSelection", "BoardingPass",
+
+    # AI schemas
+    "AIChatRequest", "AIChatResponse", "AISuggestion", "AIOrderSummary",
 ]

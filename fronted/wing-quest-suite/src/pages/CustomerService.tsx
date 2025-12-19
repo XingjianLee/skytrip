@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Phone,
@@ -36,11 +38,20 @@ const CustomerService = () => {
     subject: "",
     message: "",
   });
+  const [orderNo, setOrderNo] = useState("");
+  const [foundOrder, setFoundOrder] = useState<any | null>(null);
+  const [tickets, setTickets] = useState<any[]>([
+    { id: "TS20251217001", subject: "机票改签咨询", status: "processing", createdAt: "2025-12-17 10:32", messages: ["您好，我想咨询改签费用", "客服：请提供订单号，我们为您查询"] },
+    { id: "TS20251216008", subject: "支付失败提示", status: "resolved", createdAt: "2025-12-16 15:20", messages: ["支付时提示已支付", "客服：请刷新订单，当前订单已完成支付"] },
+  ]);
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: 实际提交逻辑
     toast.success("您的问题已提交，我们会尽快回复！");
+    const tid = `TS${new Date().toISOString().slice(0, 10).replace(/-/g, '')}${String(Math.floor(Math.random() * 900) + 100)}`;
+    setTickets([{ id: tid, subject: formData.subject || "新咨询", status: "processing", createdAt: new Date().toLocaleString(), messages: [formData.message || "", "客服：我们已收到您的咨询，将尽快回复"] }, ...tickets]);
     setFormData({
       name: "",
       email: "",
@@ -203,7 +214,7 @@ const CustomerService = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="faq" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
             <TabsTrigger value="faq" className="gap-2">
               <FileQuestion className="h-4 w-4" />
               常见问题
@@ -211,6 +222,10 @@ const CustomerService = () => {
             <TabsTrigger value="contact" className="gap-2">
               <MessageSquare className="h-4 w-4" />
               在线咨询
+            </TabsTrigger>
+            <TabsTrigger value="self" className="gap-2">
+              <HeadphonesIcon className="h-4 w-4" />
+              自助服务
             </TabsTrigger>
           </TabsList>
 
@@ -383,6 +398,122 @@ const CustomerService = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="self" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  订单自助查询
+                </CardTitle>
+                <CardDescription>输入订单号查询订单摘要并快速处理</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <Input value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="输入订单号，如 ST20251217001" />
+                  <Button onClick={() => {
+                    const data = [
+                      { order_no: "ST20251217001", type: "flight", route: "北京 PEK → 上海 PVG", date: "2025-12-23", status: "paid" },
+                      { order_no: "ST20251216002", type: "hotel", route: "广州长隆酒店", date: "2025-12-21", status: "pending" },
+                      { order_no: "ST20251215008", type: "ticket", route: "上海迪士尼乐园", date: "2025-12-24", status: "paid" },
+                    ];
+                    const f = data.find(x => x.order_no === orderNo.trim());
+                    setFoundOrder(f || null);
+                    if (!f) toast.error("未找到该订单号");
+                  }}>查询</Button>
+                </div>
+                {foundOrder && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items中心 justify-between">
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">订单号</div>
+                        <div className="font-medium">{foundOrder.order_no}</div>
+                      </div>
+                      <Badge variant={foundOrder.status === "paid" ? "default" : "secondary"}>{foundOrder.status === "paid" ? "已支付" : "待支付"}</Badge>
+                    </div>
+                    <Separator />
+                    <div className="grid md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">类型</div>
+                        <div className="font-medium">{foundOrder.type}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">行程/地点</div>
+                        <div className="font-medium">{foundOrder.route}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">日期</div>
+                        <div className="font-medium">{foundOrder.date}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      <Button variant="outline" onClick={() => navigate("/refund-change")}>退改签</Button>
+                      <Button variant="outline" onClick={() => navigate("/my-orders")}>查看订单</Button>
+                      <Button variant="outline" onClick={() => navigate("/check-in")}>在线值机</Button>
+                      <Button onClick={() => navigate("/price-calendar")}>查看低价</Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HeadphonesIcon className="h-5 w-5 text-primary" />
+                  我的工单
+                </CardTitle>
+                <CardDescription>查看咨询工单进度与详情</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {tickets.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <div className="font-medium">{t.subject}</div>
+                        <div className="text-xs text-muted-foreground">编号 {t.id} · {t.createdAt}</div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge variant={t.status === "resolved" ? "default" : "secondary"}>{t.status === "resolved" ? "已解决" : "处理中"}</Badge>
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedTicket(t); setTicketDialogOpen(true); }}>查看</Button>
+                        {t.status !== "resolved" && (
+                          <Button size="sm" onClick={() => {
+                            setTickets(tickets.map(x => x.id === t.id ? { ...x, status: "resolved" } : x));
+                            toast.success("已标记为已解决");
+                          }}>标记已解决</Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Dialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>工单详情</DialogTitle>
+                </DialogHeader>
+                {selectedTicket && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{selectedTicket.subject}</div>
+                      <Badge variant={selectedTicket.status === "resolved" ? "default" : "secondary"}>{selectedTicket.status === "resolved" ? "已解决" : "处理中"}</Badge>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      {selectedTicket.messages.map((m: string, idx: number) => (
+                        <div key={idx} className="p-2 rounded bg-muted/50 text-sm">{m}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setTicketDialogOpen(false)}>关闭</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </div>

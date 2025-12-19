@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, DECIMAL, Enum, DateTime, ForeignKey, Index
+from sqlalchemy import Column, Integer, BigInteger, String, DECIMAL, Enum, DateTime, Date, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, TimestampMixin
@@ -106,6 +106,7 @@ class OrderItem(Base):
     
     original_price = Column(DECIMAL(10, 2), nullable=False, comment="机票原价（折扣前）")
     paid_price = Column(DECIMAL(10, 2), nullable=False, comment="机票实际支付价格（折扣后）")
+    flight_date = Column(Date, nullable=True, comment="航班日期")
     
     seat_number = Column(String(10), nullable=True, comment="座位号（值机后分配）")
     contact_email = Column(String(100), nullable=True, comment="联系邮箱（统一与订单一致）")

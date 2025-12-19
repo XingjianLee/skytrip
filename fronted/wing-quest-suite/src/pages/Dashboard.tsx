@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Plane, 
-  Hotel, 
-  Ticket, 
-  Calendar, 
-  MapPin, 
+import DashboardMainNew from "@/components/DashboardMainNew";
+import {
+  Plane,
+  Hotel,
+  Ticket,
+  Calendar,
+  MapPin,
   Clock,
   TrendingUp,
   Users,
@@ -22,12 +23,12 @@ const Dashboard = () => {
   useEffect(() => {
     const isLoggedIn = localStorage.getItem("isLoggedIn");
     const userData = localStorage.getItem("user");
-    
+
     if (!isLoggedIn || !userData) {
       navigate("/auth");
       return;
     }
-    
+
     setUser(JSON.parse(userData));
   }, [navigate]);
 
@@ -111,7 +112,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <Navbar isLoggedIn={true} />
-      
+
       <main className="container mx-auto px-6 pt-24 pb-12">
         {/* 欢迎区域 */}
         <div className="mb-8 animate-fade-in">
@@ -126,7 +127,7 @@ const Dashboard = () => {
         {/* 统计卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <Card 
+            <Card
               key={index}
               className="border-border/50 hover:shadow-elegant transition-all duration-300 hover:scale-105 animate-fade-in-up"
               style={{ animationDelay: `${index * 100}ms` }}
@@ -150,7 +151,7 @@ const Dashboard = () => {
         {/* 快捷操作 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {quickActions.map((action, index) => (
-            <Card 
+            <Card
               key={index}
               className="border-border/50 hover:shadow-elegant transition-all duration-300 hover:scale-105 cursor-pointer animate-fade-in-up"
               style={{ animationDelay: `${(index + 4) * 100}ms` }}
@@ -183,7 +184,7 @@ const Dashboard = () => {
           <CardContent>
             <div className="space-y-4">
               {recentActivities.map((activity, index) => (
-                <div 
+                <div
                   key={index}
                   className="flex items-start gap-4 p-4 rounded-lg hover:bg-accent/5 transition-colors"
                 >
@@ -206,6 +207,10 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+
+        <div className="mt-10">
+          <DashboardMainNew />
+        </div>
       </main>
     </div>
   );

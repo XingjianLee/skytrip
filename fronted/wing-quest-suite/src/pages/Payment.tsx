@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { payOrder, getOrders, getOrderById } from "@/lib/api";
+import { payOrder, getOrders, getOrderById, updateOrderItemChange } from "@/lib/api";
 
 interface PaymentMethod {
     id: string;
@@ -25,6 +25,7 @@ const Payment = () => {
     const location = useLocation();
     const { toast } = useToast();
     const [orderState, setOrderState] = useState<any>(location.state?.orderData);
+    const changeCommit = (location.state as any)?.changeCommit;
 
     const [selectedMethod, setSelectedMethod] = useState("alipay");
     const [cardInfo, setCardInfo] = useState({
@@ -181,8 +182,12 @@ const Payment = () => {
         toast({ title: "正在处理支付", description: "请稍候..." });
         try {
             const token = localStorage.getItem("access_token") || "";
-            if (!orderState?.orderId) throw new Error("缺少订单ID");
-            await payOrder(orderState.orderId, token);
+            if (changeCommit && changeCommit.itemId && changeCommit.flight_id && changeCommit.cabin_class && changeCommit.flight_date) {
+                await updateOrderItemChange(changeCommit.itemId, changeCommit.flight_id, changeCommit.cabin_class, changeCommit.flight_date, token);
+            } else {
+                if (!orderState?.orderId) throw new Error("缺少订单ID");
+                await payOrder(orderState.orderId, token);
+            }
             toast({ title: "支付成功！", description: "订单已确认，祝您旅途愉快" });
             navigate("/my-orders");
         } catch (e: any) {

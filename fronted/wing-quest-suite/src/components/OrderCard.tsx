@@ -273,7 +273,7 @@ const OrderCard = ({ order, onViewDetails }: OrderCardProps) => {
           </>
         )}
         {order.paymentStatus === "paid" && (
-          <Button variant="outline" size="sm">申请退款</Button>
+          <Button variant="outline" size="sm" onClick={() => navigate("/refund-change", { state: { orderId: order.orderId, orderNo: order.orderNo } })}>申请退款</Button>
         )}
         <Button variant="outline" size="sm" onClick={() => navigate("/check-in", { state: { orderId: order.orderId } })}>在线值机</Button>
         <Button variant="ghost" size="sm" onClick={() => onViewDetails(order)}>

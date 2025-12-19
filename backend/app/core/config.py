@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -8,9 +8,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
     # SQLALCHEMY_DATABASE_URI = "postgresql://root:liwenjun040824@localhost/skytrip"
     SQLALCHEMY_DATABASE_URI: str = "mysql+pymysql://root:liwenjun040824@localhost/skytrip"
-
-    class Config:
-        env_file = ".env"
+    AI_BASE_URL: str | None = None
+    AI_API_KEY: str | None = None
+    AI_MODEL: str | None = None
+    AI_TIMEOUT_SECONDS: int = 20
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

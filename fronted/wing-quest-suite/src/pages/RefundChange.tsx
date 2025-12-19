@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,36 +10,75 @@ import { Plane, Hotel, Ticket, Calendar, MapPin, AlertCircle, CheckCircle2, Info
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { toast } from "sonner";
+import { useNavigate, useLocation } from "react-router-dom";
+import { getOrders, type BackendOrder, getCancelPreview, cancelOrder, updateOrderItemDate, searchFlights, updateOrderItemChange } from "@/lib/api";
 
-// Fake 数据 - 机票订单
-const flightOrders = [
-  {
-    id: "F001",
-    type: "flight" as const,
-    orderNumber: "FL20251101001",
-    flightNumber: "CA1234",
-    airline: "中国国际航空",
-    departure: { city: "北京", airport: "首都国际机场", time: "2025-11-15 14:30" },
-    arrival: { city: "上海", airport: "浦东国际机场", time: "2025-11-15 17:15" },
-    passenger: "张三",
-    cabinClass: "business" as "first" | "business" | "economy",
-    ticketPrice: 1580,
-    status: "confirmed" as const,
-  },
-  {
-    id: "F002",
-    type: "flight" as const,
-    orderNumber: "FL20251105002",
-    flightNumber: "MU5678",
-    airline: "中国东方航空",
-    departure: { city: "上海", airport: "虹桥机场", time: "2025-12-20 09:00" },
-    arrival: { city: "广州", airport: "白云国际机场", time: "2025-12-20 11:45" },
-    passenger: "李四",
-    cabinClass: "economy" as "first" | "business" | "economy",
-    ticketPrice: 680,
-    status: "confirmed" as const,
-  },
-];
+type FlightView = {
+  id: string;
+  type: "flight";
+  itemId: number;
+  orderId: number;
+  orderNumber: string;
+  flightNumber: string;
+  airline: string;
+  departure: { city: string; airport: string; time: string; date: string };
+  arrival: { city: string; airport: string; time: string; date: string };
+  passenger: string;
+  cabinClass: "first" | "business" | "economy";
+  ticketPrice: number;
+  status: string;
+  isExpired?: boolean;
+};
+
+function toDateString(d: Date) {
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function mapBackendToFlightViews(list: BackendOrder[]): FlightView[] {
+  const res: FlightView[] = [];
+  for (const o of list) {
+    const createdAt = new Date(o.created_at);
+    for (const it of o.items) {
+      const dep = it.flight?.route?.departure_airport;
+      const arr = it.flight?.route?.arrival_airport;
+      const baseDateStr = it.flight_date || toDateString(createdAt);
+      const fv: FlightView = {
+        id: `${o.order_no}-${it.item_id}`,
+        type: "flight",
+        itemId: it.item_id,
+        orderId: o.order_id,
+        orderNumber: o.order_no,
+        flightNumber: it.flight?.flight_number || String(it.flight_id),
+        airline: it.flight?.airline?.airline_name || "",
+        departure: {
+          city: dep?.city || "",
+          airport: dep?.airport_code || "",
+          time: it.flight?.scheduled_departure_time || "00:00",
+          date: baseDateStr,
+        },
+        arrival: {
+          city: arr?.city || "",
+          airport: arr?.airport_code || "",
+          time: it.flight?.scheduled_arrival_time || "00:00",
+          date: baseDateStr,
+        },
+        passenger: it.passenger?.name || "",
+        cabinClass: it.cabin_class,
+        ticketPrice: it.paid_price,
+        status: it.ticket_status,
+        isExpired: (() => {
+          const dep = new Date(`${baseDateStr}T${(it.flight?.scheduled_departure_time || '00:00')}`);
+          return dep.getTime() <= Date.now();
+        })(),
+      };
+      res.push(fv);
+    }
+  }
+  return res;
+}
 
 // Fake 数据 - 酒店订单
 const hotelOrders = [
@@ -183,23 +222,155 @@ const calculateTicketCancelFee = (visitDate: string, totalPrice: number) => {
 };
 
 const RefundChange = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [actionType, setActionType] = useState<"refund" | "change">("refund");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [flightDate, setFlightDate] = useState<string>("");
+  const [orders, setOrders] = useState<BackendOrder[]>([]);
+  const [backendFlightOrders, setBackendFlightOrders] = useState<FlightView[]>([]);
+  const [token, setToken] = useState<string>("");
+  const [previewPenalty, setPreviewPenalty] = useState<number | null>(null);
+  const [previewRefund, setPreviewRefund] = useState<number | null>(null);
+  const [changeTime, setChangeTime] = useState<string>("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
+
+  useEffect(() => {
+    const t = localStorage.getItem("access_token") || "";
+    if (!t) {
+      toast.error("登录已过期，请重新登录");
+      navigate("/auth");
+      return;
+    }
+    setToken(t);
+    (async () => {
+      try {
+        const list = await getOrders(t, { limit: 50 });
+        setOrders(list);
+        const views = mapBackendToFlightViews(list);
+        setBackendFlightOrders(views);
+        const st: any = location.state || {};
+        if (st.orderId) {
+          const fv = views.find(x => x.orderId === st.orderId);
+          if (fv) {
+            setSelectedOrder(fv);
+            setFlightDate(fv.departure.date);
+            setActionType("refund");
+            setDialogOpen(true);
+          }
+        }
+      } catch (e: any) {
+        toast.error(String(e?.message || "加载订单失败"));
+      }
+    })();
+  }, []);
 
   const handleOpenDialog = (order: any, action: "refund" | "change") => {
     setSelectedOrder(order);
     setActionType(action);
     setDialogOpen(true);
+    const d = order?.departure?.date || toDateString(new Date());
+    setFlightDate(d);
+    if (order?.departure?.time) setChangeTime(order.departure.time);
+    if (action === "refund") {
+      (async () => {
+        try {
+          const pv = await getCancelPreview(order.orderId, d, token);
+          setPreviewPenalty(pv.penalty_total);
+          setPreviewRefund(pv.refund_total);
+        } catch {
+          setPreviewPenalty(null);
+          setPreviewRefund(null);
+        }
+      })();
+    } else {
+      setPreviewPenalty(null);
+      setPreviewRefund(null);
+      setSearchResults([]);
+      setSelectedCandidate(null);
+    }
   };
 
-  const handleConfirmAction = () => {
+  const handleConfirmAction = async () => {
     if (!selectedOrder) return;
-
-    const actionText = actionType === "refund" ? "退票" : "改签";
-    toast.success(`${actionText}申请已提交，我们会尽快处理`);
+    if (actionType === "refund") {
+      try {
+        await cancelOrder(selectedOrder.orderId, flightDate, token);
+        toast.success("退票已提交");
+        const list = await getOrders(token, { limit: 50 });
+        setOrders(list);
+        setBackendFlightOrders(mapBackendToFlightViews(list));
+      } catch (e: any) {
+        toast.error(String(e?.message || "退票失败"));
+      }
+    } else {
+      try {
+        if (!selectedCandidate) {
+          toast.error("请先选择可改签的目标航班");
+          return;
+        }
+        const feeObj = calculateChangeFee(`${flightDate} ${changeTime}`, selectedOrder.ticketPrice, selectedOrder.cabinClass);
+        const diff = Math.round(Number(selectedCandidate.current_price) - Number(selectedOrder.ticketPrice));
+        const totalDue = Math.max(0, diff) + feeObj.fee;
+        if (totalDue > 0) {
+          navigate("/payment", {
+            state: {
+              orderData: {
+                orderId: selectedOrder.orderId,
+                flightInfo: `${selectedOrder.departure.city} ${selectedOrder.departure.airport} → ${selectedOrder.arrival.city} ${selectedOrder.arrival.airport}`,
+                cabinName: selectedOrder.cabinClass === "economy" ? "经济舱" : selectedOrder.cabinClass === "business" ? "商务舱" : "头等舱",
+                passengerCount: 1,
+                basePrice: totalDue,
+                airportFee: 0,
+                fuelSurcharge: 0,
+                grandTotal: totalDue,
+              },
+              changeCommit: {
+                itemId: selectedOrder.itemId,
+                flight_id: selectedCandidate.flight_id,
+                cabin_class: selectedOrder.cabinClass,
+                flight_date: flightDate,
+              }
+            }
+          });
+        } else {
+          await updateOrderItemChange(selectedOrder.itemId, selectedCandidate.flight_id, selectedOrder.cabinClass, flightDate, token);
+          toast.success("改签已提交并同步");
+          const list = await getOrders(token, { limit: 50 });
+          setOrders(list);
+          setBackendFlightOrders(mapBackendToFlightViews(list));
+        }
+      } catch (e: any) {
+        toast.error(String(e?.message || "改签失败"));
+      }
+    }
     setDialogOpen(false);
     setSelectedOrder(null);
+  };
+
+  const handleSearchCandidates = async () => {
+    if (!selectedOrder) return;
+    setSearching(true);
+    try {
+      const req: any = {
+        departure_city: selectedOrder.departure.city,
+        arrival_city: selectedOrder.arrival.city,
+        departure_date: flightDate,
+        adult_count: 1,
+        cabin_class: selectedOrder.cabinClass,
+      };
+      const res = await searchFlights(req);
+      const flights = res?.outbound_flights || [];
+      setSearchResults(flights);
+      setSelectedCandidate(null);
+    } catch (e: any) {
+      toast.error(String(e?.message || "搜索航班失败"));
+    } finally {
+      setSearching(false);
+    }
   };
 
   const cabinClassNames = {
@@ -255,9 +426,9 @@ const RefundChange = () => {
 
             {/* 机票订单 */}
             <TabsContent value="flights" className="space-y-4">
-              {flightOrders.map((order) => {
+              {backendFlightOrders.map((order) => {
                 const { fee, feePercentage, timeCategory } = calculateChangeFee(
-                  order.departure.time,
+                  `${order.departure.date} ${order.departure.time}`,
                   order.ticketPrice,
                   order.cabinClass
                 );
@@ -275,7 +446,7 @@ const RefundChange = () => {
                         </div>
                         <Badge variant="secondary" className="flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3" />
-                          已确认
+                          {order.isExpired ? "已过期" : "已确认"}
                         </Badge>
                       </div>
                     </CardHeader>
@@ -285,7 +456,7 @@ const RefundChange = () => {
                         <div className="space-y-1">
                           <div className="text-2xl font-bold">{order.departure.city}</div>
                           <div className="text-sm text-muted-foreground">{order.departure.airport}</div>
-                          <div className="text-sm font-medium">{order.departure.time}</div>
+                          <div className="text-sm font-medium">{order.departure.date} {order.departure.time}</div>
                         </div>
 
                         <div className="flex flex-col items-center gap-1">
@@ -296,7 +467,7 @@ const RefundChange = () => {
                         <div className="space-y-1 text-right">
                           <div className="text-2xl font-bold">{order.arrival.city}</div>
                           <div className="text-sm text-muted-foreground">{order.arrival.airport}</div>
-                          <div className="text-sm font-medium">{order.arrival.time}</div>
+                          <div className="text-sm font-medium">{order.arrival.date} {order.arrival.time}</div>
                         </div>
                       </div>
 
@@ -346,6 +517,7 @@ const RefundChange = () => {
                           variant="outline"
                           className="flex-1"
                           onClick={() => handleOpenDialog(order, "refund")}
+                          disabled={order.isExpired}
                         >
                           申请退票
                         </Button>
@@ -577,6 +749,51 @@ const RefundChange = () => {
                   <span className="text-muted-foreground">订单号：</span>
                   <span className="font-medium">{selectedOrder.orderNumber}</span>
                 </div>
+                {actionType === "refund" && (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="flight-date">航班日期</Label>
+                    <input id="flight-date" type="date" value={flightDate} onChange={async (e) => {
+                      const v = e.target.value;
+                      setFlightDate(v);
+                      try {
+                        const pv = await getCancelPreview(selectedOrder.orderId, v, token);
+                        setPreviewPenalty(pv.penalty_total);
+                        setPreviewRefund(pv.refund_total);
+                      } catch {
+                        setPreviewPenalty(null);
+                        setPreviewRefund(null);
+                      }
+                    }} className="border rounded-md px-2 py-1 text-sm" />
+                  </div>
+                )}
+                {actionType === "change" && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="change-date">改签日期</Label>
+                      <input id="change-date" type="date" value={flightDate} onChange={(e) => setFlightDate(e.target.value)} className="border rounded-md px-2 py-1 text-sm" />
+                      <Label htmlFor="change-time" className="ml-4">起飞时刻</Label>
+                      <input id="change-time" type="time" value={changeTime} onChange={(e) => setChangeTime(e.target.value)} className="border rounded-md px-2 py-1 text-sm" />
+                      <Button variant="outline" className="ml-3" onClick={handleSearchCandidates} disabled={searching}>搜索可改签航班</Button>
+                    </div>
+                    {searchResults.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {searchResults.map((f) => (
+                          <div key={f.flight_id} className={`flex items-center justify-between p-3 border rounded-md ${selectedCandidate?.flight_id === f.flight_id ? 'border-primary' : 'border-border'}`}>
+                            <div className="text-sm">
+                              <div className="font-medium">{f.airline_name} {f.flight_number}</div>
+                              <div className="text-muted-foreground">{f.departure_city} {f.departure_airport_code} → {f.arrival_city} {f.arrival_airport_code}</div>
+                              <div className="text-muted-foreground">{f.departure_date} {f.scheduled_departure_time} → {f.arrival_date} {f.scheduled_arrival_time}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-primary font-semibold">¥{Math.round(f.current_price)}</div>
+                              <Button variant="outline" onClick={() => setSelectedCandidate(f)}>选择</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
                 {selectedOrder.type === "flight" && (
                   <>
                     <div className="text-sm">
@@ -589,15 +806,21 @@ const RefundChange = () => {
                       <span className="text-muted-foreground">预估手续费：</span>
                       <span className="font-bold text-orange-500">
                         ¥
-                        {
-                          calculateChangeFee(
-                            selectedOrder.departure.time,
-                            selectedOrder.ticketPrice,
-                            selectedOrder.cabinClass
-                          ).fee
-                        }
+                        {actionType === "refund" ? (previewPenalty != null ? previewPenalty : calculateChangeFee(`${selectedOrder.departure.date} ${selectedOrder.departure.time}`, selectedOrder.ticketPrice, selectedOrder.cabinClass).fee) : (selectedCandidate ? calculateChangeFee(`${flightDate} ${changeTime}`, selectedOrder.ticketPrice, selectedOrder.cabinClass).fee : 0)}
                       </span>
                     </div>
+                    {actionType === "change" && selectedCandidate && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">预估差价：</span>
+                        <span className="font-bold text-primary">¥{Math.max(0, Math.round(Number(selectedCandidate.current_price) - Number(selectedOrder.ticketPrice)))}</span>
+                      </div>
+                    )}
+                    {previewRefund != null && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">预估退款：</span>
+                        <span className="font-bold text-green-600">¥{previewRefund}</span>
+                      </div>
+                    )}
                   </>
                 )}
                 {selectedOrder.type === "hotel" && (

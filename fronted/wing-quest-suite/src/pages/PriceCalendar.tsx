@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,22 +12,62 @@ import { toast } from "sonner";
 import { addDays, format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { zhCN } from "date-fns/locale";
 
-// Fake price data for demonstration
-const generatePriceData = () => {
+// Mock price data generator (front-end only), deterministic per route/cabin/date
+const seededRandom = (seed: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  // Map to [0.85, 1.15]
+  return 0.85 + ((h >>> 0) % 1000) / 1000 * 0.30;
+};
+
+const routeFactor = (dep: string, arr: string) => {
+  const key = `${dep}-${arr}`;
+  const table: Record<string, number> = {
+    "PEK-PVG": 1.00, "PVG-PEK": 1.00,
+    "PEK-CAN": 1.20, "CAN-PEK": 1.20,
+    "PEK-CTU": 1.20, "CTU-PEK": 1.20,
+    "PEK-SZX": 1.25, "SZX-PEK": 1.25,
+    "PEK-HGH": 1.05, "HGH-PEK": 1.05,
+    "PVG-CAN": 1.15, "CAN-PVG": 1.15,
+    "PVG-CTU": 1.20, "CTU-PVG": 1.20,
+    "PVG-SZX": 1.20, "SZX-PVG": 1.20,
+    "PVG-HGH": 0.90, "HGH-PVG": 0.90,
+    "CAN-CTU": 1.00, "CTU-CAN": 1.00,
+    "CAN-SZX": 0.90, "SZX-CAN": 0.90,
+    "CAN-HGH": 1.10, "HGH-CAN": 1.10,
+    "CTU-SZX": 1.00, "SZX-CTU": 1.00,
+    "CTU-HGH": 1.05, "HGH-CTU": 1.05,
+    "SZX-HGH": 1.10, "HGH-SZX": 1.10,
+  };
+  return table[key] ?? 1.10;
+};
+
+const cabinFactor = (cabin: string) => (
+  cabin === "business" ? 1.7 : cabin === "first" ? 2.3 : 1.0
+);
+
+const generateRoutePriceData = (dep: string, arr: string, cabin: string) => {
   const today = new Date();
   const priceMap: { [key: string]: number } = {};
-  
+  const rf = routeFactor(dep, arr);
+  const cf = cabinFactor(cabin);
   for (let i = 0; i < 60; i++) {
     const date = addDays(today, i);
     const dateKey = format(date, "yyyy-MM-dd");
-    // Generate random prices between 500-2000
-    const basePrice = 800 + Math.random() * 800;
-    // Weekend prices tend to be higher
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    const price = Math.round(basePrice * (isWeekend ? 1.3 : 1));
+    const dow = date.getDay();
+    const weekend = (dow === 0 || dow === 6) ? 1.15 : 1.0;
+    const fridayBump = (dow === 5) ? 1.10 : 1.0;
+    const mondayDrop = (dow === 1) ? 0.95 : 1.0;
+    const seasonal = 1 + Math.sin(i / 8) * 0.10; // ±10%
+    const rand = seededRandom(`${dep}-${arr}-${cabin}-${dateKey}`);
+    const base = 700;
+    let price = Math.round(base * rf * cf * weekend * fridayBump * mondayDrop * seasonal * rand);
+    price = Math.max(300, Math.min(3500, price));
     priceMap[dateKey] = price;
   }
-  
   return priceMap;
 };
 
@@ -48,12 +88,16 @@ const cabinClasses = [
 
 const PriceCalendar = () => {
   const navigate = useNavigate();
-  const [priceData] = useState(generatePriceData());
+  const [priceData, setPriceData] = useState<{ [key: string]: number }>({});
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [departure, setDeparture] = useState("PEK");
   const [arrival, setArrival] = useState("PVG");
   const [cabinClass, setCabinClass] = useState("economy");
+
+  useEffect(() => {
+    setPriceData(generateRoutePriceData(departure, arrival, cabinClass));
+  }, [departure, arrival, cabinClass]);
 
   const getPriceForDate = (date: Date) => {
     const dateKey = format(date, "yyyy-MM-dd");
@@ -100,7 +144,7 @@ const PriceCalendar = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-secondary/20">
       <Navbar isLoggedIn={true} />
-      
+
       <main className="flex-1 container mx-auto px-4 py-8 mt-16">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
@@ -206,15 +250,15 @@ const PriceCalendar = () => {
                   <CardTitle className="flex items-center justify-between">
                     <span>{format(selectedMonth, "yyyy年MM月", { locale: zhCN })}</span>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setSelectedMonth(addDays(selectedMonth, -30))}
                       >
                         上月
                       </Button>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => setSelectedMonth(addDays(selectedMonth, 30))}
                       >
@@ -231,19 +275,19 @@ const PriceCalendar = () => {
                         {day}
                       </div>
                     ))}
-                    
+
                     {/* Empty cells for alignment */}
                     {Array.from({ length: monthStart.getDay() }).map((_, i) => (
                       <div key={`empty-${i}`} className="aspect-square" />
                     ))}
-                    
+
                     {/* Date cells with prices */}
                     {daysInMonth.map(date => {
                       const price = getPriceForDate(date);
                       const priceLevel = getPriceLevel(price);
                       const isSelected = selectedDate && isSameDay(date, selectedDate);
                       const isPast = date < new Date() && !isSameDay(date, new Date());
-                      
+
                       return (
                         <button
                           key={date.toISOString()}
@@ -253,13 +297,12 @@ const PriceCalendar = () => {
                             }
                           }}
                           disabled={isPast}
-                          className={`aspect-square p-2 rounded-lg border-2 transition-all ${
-                            isPast 
-                              ? "bg-muted/50 cursor-not-allowed opacity-50" 
-                              : isSelected
+                          className={`aspect-square p-2 rounded-lg border-2 transition-all ${isPast
+                            ? "bg-muted/50 cursor-not-allowed opacity-50"
+                            : isSelected
                               ? "border-primary bg-primary/10 scale-105"
                               : getPriceLevelColor(priceLevel)
-                          } hover:scale-105 disabled:hover:scale-100`}
+                            } hover:scale-105 disabled:hover:scale-100`}
                         >
                           <div className="flex flex-col items-center justify-center h-full">
                             <div className="text-sm font-medium">{format(date, "d")}</div>
@@ -320,7 +363,7 @@ const PriceCalendar = () => {
                 <CardContent>
                   <div className="space-y-3">
                     {cheapestDates.map((item, index) => (
-                      <div 
+                      <div
                         key={item.date.toISOString()}
                         className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                         onClick={() => handleBookFlight(item.date)}
@@ -366,8 +409,8 @@ const PriceCalendar = () => {
                         ¥{getPriceForDate(selectedDate)}
                       </div>
                     </div>
-                    <Button 
-                      className="w-full" 
+                    <Button
+                      className="w-full"
                       size="lg"
                       onClick={() => handleBookFlight(selectedDate)}
                     >

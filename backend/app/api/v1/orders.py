@@ -4,11 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 import re
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_
+from sqlalchemy import text
 
 from ... import dependencies as deps
 from ... import crud, schemas, models
 from ...crud.order import order_item as order_item_crud
 from ...crud.order import order_item as order_item_crud
+from app.models import flight_pricing as fp_model
 
 router = APIRouter()
 
@@ -179,6 +181,13 @@ def create_order(
             total_original += base_price
             total_paid += base_price
 
+            from datetime import datetime as _dt
+            fd = None
+            try:
+                if getattr(it, 'flight_date', None):
+                    fd = _dt.strptime(it.flight_date, "%Y-%m-%d").date()
+            except Exception:
+                fd = None
             oi = OrderItemModel(
                 order_id=order_obj.order_id,
                 flight_id=it.flight_id,
@@ -186,6 +195,7 @@ def create_order(
                 passenger_id=p.passenger_id,
                 original_price=base_price,
                 paid_price=base_price,
+                flight_date=fd,
             )
             # 统一为同订单的联系邮箱（若提供）
             if order_in.contact_email:
@@ -252,7 +262,8 @@ def cancel_preview(
     current_user: models.User = Depends(deps.get_current_active_user)
 ) -> Any:
     """
-    取消费用预览：根据所选航班日期判断是否收取 10% 手续费（距起飞 <24h），并校验运营掩码
+    取消费用预览：根据所选航班日期判断是否收取 30% 手续费（距起飞 <24h），并校验运营掩码
+    同时对已过期航班给出业务提示（仅支持改签）。
     """
     order = crud.order.get_with_items(db, order_id=order_id)
     if not order:
@@ -270,14 +281,18 @@ def cancel_preview(
         if not flight:
             continue
         day_diff = (flight_date - now.date()).days
-        if day_diff < 0 or day_diff >= 21:
+        if day_diff < 0:
+            raise HTTPException(status_code=400, detail="航班已过期仅支持改签")
+        if day_diff >= 21:
             raise HTTPException(status_code=400, detail="航班日期不在运营掩码范围内")
         if flight.operating_days[day_diff] != '1':
             raise HTTPException(status_code=400, detail="所选日期航班未运营")
         dep_dt = datetime.combine(flight_date, flight.scheduled_departure_time)
         within_24h = (dep_dt - now).total_seconds() < 24 * 3600
+        if dep_dt <= now:
+            raise HTTPException(status_code=400, detail="航班已过期仅支持改签")
         paid = float(it.paid_price)
-        penalty = paid * 0.10 if within_24h and paid > 0 else 0.0
+        penalty = paid * 0.30 if within_24h and paid > 0 else 0.0
         refund = paid - penalty if paid > 0 else 0.0
         penalty_total += penalty
         refund_total += refund
@@ -309,8 +324,9 @@ def cancel_order(
     if order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="无权取消此订单")
     
-    # 只能取消待支付或已支付的订单
-    if order.status not in [schemas.OrderStatus.PENDING, schemas.OrderStatus.PAID]:
+    # 只能取消待支付或已支付的订单（按值比较避免跨枚举类型不相等）
+    current_status = order.status.value if hasattr(order.status, 'value') else str(order.status)
+    if current_status not in [schemas.OrderStatus.PENDING.value, schemas.OrderStatus.PAID.value]:
         raise HTTPException(status_code=400, detail="订单状态无法取消")
 
     order_with_items = crud.order.get_with_items(db, order_id=order_id)
@@ -326,12 +342,16 @@ def cancel_order(
             if not flight:
                 continue
             day_diff = (flight_date - now.date()).days
-            if day_diff < 0 or day_diff >= 21:
+            if day_diff < 0:
+                raise HTTPException(status_code=400, detail="航班已过期仅支持改签")
+            if day_diff >= 21:
                 raise HTTPException(status_code=400, detail="航班日期不在运营掩码范围内")
             if flight.operating_days[day_diff] != '1':
                 raise HTTPException(status_code=400, detail="所选日期航班未运营")
             # 起飞时间
             dep_dt = datetime.combine(flight_date, flight.scheduled_departure_time)
+            if dep_dt <= now:
+                raise HTTPException(status_code=400, detail="航班已过期仅支持改签")
             _ = (dep_dt - now).total_seconds() < 24 * 3600  # 计算结果若需落库，可在此扩展
 
     # 更新订单状态
@@ -546,3 +566,92 @@ def get_expired_orders(
             orders_with_items.append(order_with_items)
     
     return orders_with_items
+@router.put("/items/{item_id}/date", response_model=schemas.OrderItemWithDetails)
+def update_order_item_date(
+    *,
+    db: Session = Depends(deps.get_db),
+    item_id: int,
+    flight_date: date,
+    current_user: models.User = Depends(deps.get_current_active_user)
+) -> Any:
+    """
+    更新订单项的航班日期（同步到数据库）。
+    若旧库缺少列，尝试自动添加列后再更新。
+    """
+    oi = crud.order_item.get_with_details(db, item_id=item_id)
+    if not oi:
+        raise HTTPException(status_code=404, detail="订单项不存在")
+    if oi.order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权修改此订单项")
+    try:
+        # 尝试更新
+        from app.models.order import OrderItem as OrderItemModel
+        rec = db.query(OrderItemModel).filter(OrderItemModel.item_id == item_id).first()
+        if rec is None:
+            raise HTTPException(status_code=404, detail="订单项不存在")
+        rec.flight_date = flight_date
+        db.add(rec)
+        db.commit()
+        db.refresh(rec)
+        ret = crud.order_item.get_with_details(db, item_id=item_id)
+        return schemas.OrderItemWithDetails.model_validate(ret, from_attributes=True)
+    except Exception:
+        # 可能是旧库缺少列，尝试补列
+        try:
+            db.execute(text("ALTER TABLE order_items ADD COLUMN flight_date DATE NULL"))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="数据库不支持自动添加航班日期列，请手动迁移")
+        # 重试更新
+        from app.models.order import OrderItem as OrderItemModel
+        rec = db.query(OrderItemModel).filter(OrderItemModel.item_id == item_id).first()
+        rec.flight_date = flight_date
+        db.add(rec)
+        db.commit()
+        db.refresh(rec)
+        ret = crud.order_item.get_with_details(db, item_id=item_id)
+        return schemas.OrderItemWithDetails.model_validate(ret, from_attributes=True)
+@router.put("/items/{item_id}/change", response_model=schemas.OrderItemWithDetails)
+def update_order_item_change(
+    *,
+    db: Session = Depends(deps.get_db),
+    item_id: int,
+    flight_id: int,
+    cabin_class: str,
+    flight_date: date,
+    current_user: models.User = Depends(deps.get_current_active_user)
+) -> Any:
+    """
+    改签提交：更新订单项的航班、舱位与日期，并按基础定价更新订单项价格与订单总额。
+    """
+    from app.models.order import OrderItem as OrderItemModel, Order as OrderModel
+    # 加载订单项与订单归属校验
+    oi = db.query(OrderItemModel).filter(OrderItemModel.item_id == item_id).first()
+    if not oi:
+        raise HTTPException(status_code=404, detail="订单项不存在")
+    order = db.query(OrderModel).filter(OrderModel.order_id == oi.order_id).first()
+    if not order or order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权修改此订单项")
+    # 校验航班存在与舱位定价
+    flight = crud.flight.get(db, id=flight_id)
+    if not flight:
+        raise HTTPException(status_code=400, detail="目标航班不存在")
+    pricing = db.query(fp_model.FlightPricing).filter(fp_model.FlightPricing.flight_id == flight_id, fp_model.FlightPricing.cabin_class == cabin_class).first()
+    if not pricing:
+        raise HTTPException(status_code=400, detail="目标舱位无定价")
+    # 更新订单项
+    oi.flight_id = flight_id
+    oi.cabin_class = cabin_class
+    oi.flight_date = flight_date
+    oi.paid_price = pricing.base_price
+    db.add(oi)
+    # 更新订单总额（按订单项 paid_price 汇总）
+    items = db.query(OrderItemModel).filter(OrderItemModel.order_id == order.order_id).all()
+    total = sum([float(x.paid_price or 0) for x in items])
+    order.total_amount = total
+    db.add(order)
+    db.commit()
+    db.refresh(oi)
+    ret = order_item_crud.get_with_details(db, item_id=item_id)
+    return schemas.OrderItemWithDetails.model_validate(ret, from_attributes=True)

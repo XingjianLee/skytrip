@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getOrders, type BackendOrder } from "@/lib/api";
 import {
   Plane,
   Hotel,
@@ -67,6 +69,7 @@ const mockTrips: Trip[] = [
 
 const RecentTrips = () => {
   const navigate = useNavigate();
+  const [trips, setTrips] = useState<Trip[]>([]);
 
   const getIcon = (type: Trip["type"]) => {
     switch (type) {
@@ -101,6 +104,70 @@ const RecentTrips = () => {
     }
   };
 
+  const mapBackendOrdersToTrips = (orders: BackendOrder[]): Trip[] => {
+    const res: Trip[] = [];
+    const now = Date.now();
+    for (const o of orders) {
+      for (const it of o.items) {
+        const dep = it.flight?.route?.departure_airport;
+        const arr = it.flight?.route?.arrival_airport;
+        const dateStr = it.flight_date || new Date(o.created_at).toISOString().slice(0, 10);
+        const timeStr = (it.flight?.scheduled_departure_time || "00:00").slice(0, 5);
+        const title = dep && arr ? `${dep.city} → ${arr.city}` : `航班 ${it.flight?.flight_number || it.flight_id}`;
+        const subtitle = `${it.flight?.airline?.airline_name || ""} ${it.flight?.flight_number || it.flight_id}`.trim();
+        const location = dep ? `${dep.city} ${dep.airport_code}` : "待确认";
+        const depDateTime = new Date(`${dateStr}T${it.flight?.scheduled_departure_time || "00:00"}`).getTime();
+        const status: Trip["status"] =
+          depDateTime > now ? "upcoming" : (Math.abs(depDateTime - now) < 6 * 3600 * 1000 ? "ongoing" : "completed");
+        const statusText = status === "upcoming" ? "即将出发" : status === "ongoing" ? "进行中" : "已完成";
+        const details = `${it.cabin_class === "economy" ? "经济舱" : it.cabin_class === "business" ? "商务舱" : "头等舱"} · 1位乘客`;
+        res.push({
+          id: `${o.order_no}-${it.item_id}`,
+          type: "flight",
+          title,
+          subtitle,
+          date: dateStr,
+          time: timeStr,
+          location,
+          status,
+          statusText,
+          details,
+        });
+      }
+    }
+    // 排序：按出发时间升序，仅保留未来或近期 7 天内的前 3 个
+    const sorted = res
+      .sort((a, b) => {
+        const ta = new Date(`${a.date}T${(a.time || "00:00")}:00`).getTime();
+        const tb = new Date(`${b.date}T${(b.time || "00:00")}:00`).getTime();
+        return ta - tb;
+      })
+      .filter(t => new Date(t.date).getTime() >= new Date().setDate(new Date().getDate() - 1))
+      .slice(0, 3);
+    return sorted;
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token") || "";
+    if (!token) {
+      // 未登录，仅展示 mock
+      setTrips(mockTrips);
+      return;
+    }
+    (async () => {
+      try {
+        const orders = await getOrders(token, { limit: 20 });
+        const realTrips = mapBackendOrdersToTrips(orders);
+        // 真实订单在前，若不足 3 个，用 mock 补齐
+        const need = Math.max(0, 3 - realTrips.length);
+        const mockTail = need > 0 ? mockTrips.slice(0, need) : [];
+        setTrips([...realTrips, ...mockTail]);
+      } catch {
+        setTrips(mockTrips);
+      }
+    })();
+  }, []);
+
   return (
     <div className="bg-background border-b">
       <div className="container mx-auto px-6 py-8">
@@ -120,7 +187,7 @@ const RecentTrips = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mockTrips.map((trip) => {
+          {trips.map((trip) => {
             const Icon = getIcon(trip.type);
             return (
               <Card
@@ -184,7 +251,7 @@ const RecentTrips = () => {
           })}
         </div>
 
-        {mockTrips.length === 0 && (
+        {trips.length === 0 && (
           <Card className="p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">

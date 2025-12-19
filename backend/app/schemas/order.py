@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 from .passenger import PassengerBookingInfo, Passenger
 from .flight import FlightWithDetails
@@ -49,6 +49,7 @@ class OrderItemCreate(BaseModel):
     flight_id: int = Field(..., description="航班ID")
     cabin_class: CabinClass = Field(..., description="舱位类型")
     passenger_info: PassengerBookingInfo = Field(..., description="乘客信息")
+    flight_date: Optional[date] = Field(None, description="航班日期")
 
 
 class OrderCreate(BaseModel):
@@ -78,6 +79,7 @@ class OrderItemInDBBase(BaseModel):
     passenger_id: int
     original_price: float
     paid_price: float
+    flight_date: Optional[date] = None
     seat_number: Optional[str] = None
     contact_email: Optional[str] = None
     check_in_status: CheckInStatus

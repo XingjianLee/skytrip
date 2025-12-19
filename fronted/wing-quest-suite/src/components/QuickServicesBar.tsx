@@ -38,7 +38,7 @@ const services = [
     name: "退改签",
     icon: RefreshCw,
     description: "退票改签",
-    route: "/refund",
+    route: "/refund-change",
     color: "from-yellow-500 to-orange-500",
   },
   {
@@ -46,7 +46,7 @@ const services = [
     name: "客服中心",
     icon: Headphones,
     description: "在线客服",
-    route: "/support",
+    route: "/customer-service",
     color: "from-teal-500 to-cyan-500",
   },
 ];
@@ -61,7 +61,7 @@ const QuickServicesBar = () => {
           <h2 className="text-2xl font-bold mb-1">快捷服务</h2>
           <p className="text-sm text-muted-foreground">一站式旅行服务平台</p>
         </div>
-        
+
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 max-w-5xl mx-auto">
           {services.map((service) => (
             <Card

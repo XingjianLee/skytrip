@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 # 仅注册已确认稳定的路由模块
-from . import flights, orders, login, users, check_in
+from . import flights, orders, login, users, check_in, ai
 
 api_router = APIRouter()
 
@@ -19,3 +19,4 @@ api_router.include_router(users.router, prefix="/users", tags=["users"])
 
 # 值机相关路由
 api_router.include_router(check_in.router, prefix="/check-in", tags=["check-in"])
+api_router.include_router(ai.router, prefix="/ai", tags=["ai"])

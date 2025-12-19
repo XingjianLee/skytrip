@@ -35,45 +35,24 @@ const HeroSection = () => {
                 #顶级旅行平台
               </span>
             </div>
-            
+
             <h1 className="text-5xl lg:text-6xl font-bold text-white leading-tight">
               预订您的下一次{" "}
               <span className="text-accent">冒险之旅</span> 就在今天！
             </h1>
-            
+
             <p className="text-lg text-white/80 max-w-xl">
               不要再等待合适的时机去探索世界了！现在就开始您的旅程，与我们一起获得难忘的冒险时刻。
             </p>
 
-            {/* Floating destination cards */}
-            <div className="hidden lg:block">
-              <div className="absolute right-10 top-32 animate-float">
-                <Card className="w-48 h-40 overflow-hidden shadow-card-hover group cursor-pointer">
-                  <img src={destinationDubai} alt="Dubai" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                    <p className="text-white font-semibold">探索迪拜之眼</p>
-                    <p className="text-white/80 text-xs">🌍 阿布扎比</p>
-                  </div>
-                </Card>
-              </div>
-              
-              <div className="absolute right-10 top-96 animate-float" style={{ animationDelay: '1s' }}>
-                <Card className="w-48 h-40 overflow-hidden shadow-card-hover group cursor-pointer">
-                  <img src={destinationEgypt} alt="Egypt" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                    <p className="text-white font-semibold">探索吉萨</p>
-                    <p className="text-white/80 text-xs">🌍 埃及</p>
-                  </div>
-                </Card>
-              </div>
-            </div>
+
           </div>
 
           {/* Right Content - Traveler Image */}
           <div className="relative animate-fade-in hidden lg:block">
-            <img 
-              src={heroTraveler} 
-              alt="Traveler" 
+            <img
+              src={heroTraveler}
+              alt="Traveler"
               className="w-full h-auto rounded-3xl shadow-2xl"
             />
           </div>
